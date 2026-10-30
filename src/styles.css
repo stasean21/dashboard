@@ -1751,3 +1751,153 @@ footer button:hover {
     scroll-behavior: auto !important;
   }
 }
+
+/* Metric cards control the chart and table as one view. */
+button.metric {
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+  border: 1px solid transparent;
+  padding-bottom: 29px;
+}
+button.metric:hover {
+  border-color: #ffbd98;
+  box-shadow: 0 5px 22px #ff762710;
+  transform: translateY(-1px);
+}
+button.metric:focus-visible {
+  outline: 3px solid #ffad81;
+  outline-offset: 3px;
+}
+.metric .metric-hint {
+  position: absolute;
+  left: 22px;
+  bottom: 8px;
+  font-size: 8px;
+  font-weight: 450;
+  color: #a0a7bb;
+  opacity: 0;
+  transition: opacity 0.18s;
+}
+.metric:hover .metric-hint,
+.metric:focus-visible .metric-hint {
+  opacity: 1;
+}
+.metric.accent .metric-hint {
+  color: #fffbece0;
+  opacity: 1;
+}
+.products-card .table-context {
+  font-size: 9px;
+  color: var(--muted);
+  margin-top: 5px;
+  line-height: 1.5;
+}
+.selected-metric-cell {
+  color: #c55e2b;
+}
+.quality-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  margin: 14px 0;
+}
+.quality-summary > div {
+  border-radius: 12px;
+  background: #faf7f5;
+  padding: 12px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.quality-summary > div + div {
+  background: #f5f5fa;
+}
+.quality-summary span {
+  font-size: 10px;
+  color: #9299ac;
+}
+.quality-summary strong {
+  font-size: 25px;
+  font-weight: 650;
+  letter-spacing: -0.7px;
+}
+.quality-summary small {
+  font-size: 13px;
+  font-weight: 450;
+}
+.quality-summary em {
+  font-size: 9px;
+  font-style: normal;
+  color: var(--muted);
+}
+.outcome-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.outcome-controls button {
+  background: #f6f4f9;
+  border: 1px solid transparent;
+  border-radius: 20px;
+  padding: 7px 12px;
+  font-size: 10px;
+}
+.outcome-controls button.selected {
+  background: #fff0e6;
+  border-color: #ffd8c2;
+  color: #d36a30;
+}
+.chart-dense-note {
+  font-size: 9px;
+  color: var(--muted);
+  padding: 4px 5px;
+  line-height: 1.6;
+}
+@media (max-width: 760px) {
+  .quality-summary {
+    gap: 8px;
+  }
+  .quality-summary > div {
+    padding: 10px;
+  }
+  .quality-summary span {
+    font-size: 9px;
+  }
+  .metric .metric-hint {
+    left: 16px;
+    font-size: 7px;
+  }
+  button.metric {
+    padding-bottom: 26px;
+  }
+  .trend-card .card-heading > .chip {
+    font-size: 8px;
+  }
+  .trend-card .chart-controls {
+    gap: 4px;
+  }
+  .trend-card .segmented button {
+    padding: 5px 8px;
+  }
+  .quality-summary strong {
+    font-size: 23px;
+  }
+}
+.chart-dense {
+  margin-bottom: 24px;
+}
+.chart-reconciliation {
+  font-size: 9px;
+  color: var(--muted);
+  line-height: 1.7;
+  margin: 6px 4px 8px;
+}
+.chart-reconciliation button {
+  color: #cf7547;
+  font-size: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-decoration: underline;
+}

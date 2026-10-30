@@ -91,14 +91,12 @@ test("Excel upload runs in worker and replaces report; refresh restores original
     ),
     "xl/worksheets/sheet1.xml": strToU8(sheet),
   });
-  await page
-    .locator("input[type=file]")
-    .setInputFiles({
-      name: "test.xlsx",
-      mimeType:
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      buffer: Buffer.from(file),
-    });
+  await page.locator("input[type=file]").setInputFiles({
+    name: "test.xlsx",
+    mimeType:
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    buffer: Buffer.from(file),
+  });
   await expect(page.locator(".eyebrow")).toContainText("TEST");
   await expect(metric(page, 0)).toHaveText("200 ₽");
   await expect(page.locator(".gauge>strong")).toHaveText("50%");
@@ -126,4 +124,116 @@ test("mobile viewport has no page overflow and date dialog works", async ({
     ),
   ).toBe(true);
   await page.screenshot({ path: "/tmp/formula-mobile.png", fullPage: true });
+});
+
+test("KPI cards synchronize active state, chart, product table, and dates", async ({
+  page,
+}) => {
+  await ready(page);
+  await expect(page.locator(".trend-card .chart")).toHaveAttribute(
+    "data-group",
+    "week",
+  );
+  await expect(page.locator(".trend-card .chart")).toHaveAttribute(
+    "data-buckets",
+    "14",
+  );
+  for (const [name, key, title] of [
+    ["Заказано товаров", "orders", "Товары по количеству заказанных"],
+    ["Выкуплено товаров", "bought", "Товары по количеству выкупленных"],
+    ["Средняя цена", "averagePrice", "Товары по средней цене"],
+    ["Заказано на сумму", "amount", "Товары по сумме заказов"],
+  ]) {
+    await page
+      .locator(".metrics-grid")
+      .getByRole("button", { name, exact: true })
+      .click();
+    await expect(
+      page.locator(".metrics-grid").getByRole("button", { name, exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator(".metrics-grid [aria-pressed=true]")).toHaveCount(
+      1,
+    );
+    await expect(page.locator(".trend-card .chart")).toHaveAttribute(
+      "data-metric",
+      key,
+    );
+    await expect(
+      page.getByRole("heading", { name: title, exact: true }),
+    ).toBeVisible();
+    await expect(page.locator("thead th").last()).toHaveAttribute(
+      "aria-sort",
+      "descending",
+    );
+  }
+  await page
+    .getByRole("button", { name: "Выкуплено товаров", exact: true })
+    .click();
+  await expect(
+    page.locator("tbody tr").first().locator("td").last(),
+  ).toHaveText("177");
+  await page.getByRole("button", { name: /30.07.*29.10.2026/ }).click();
+  await page.getByRole("button", { name: "7 дней", exact: true }).click();
+  await page.getByRole("button", { name: "Применить период" }).click();
+  await expect(page.locator(".trend-card .chart")).toHaveAttribute(
+    "data-group",
+    "day",
+  );
+  await expect(page.locator(".trend-card .chart")).toHaveAttribute(
+    "data-buckets",
+    "7",
+  );
+  await expect(page.locator(".chart-summary")).toContainText("224");
+  await page.getByRole("button", { name: "Средняя цена", exact: true }).click();
+  await expect(page.locator(".trend-card .chart")).toHaveAttribute(
+    "data-metric",
+    "averagePrice",
+  );
+  await expect(page.locator("thead th").last()).toContainText("Средняя цена");
+});
+
+test("quality long-range chart has useful buckets and status-linked tables; daily mode uses lines", async ({
+  page,
+}) => {
+  await ready(page);
+  await page.getByLabel("Поиск товаров").fill("5330035142");
+  await page.getByRole("button", { name: "Качество", exact: true }).click();
+  await expect(page.locator(".quality-summary")).toContainText("39");
+  await expect(page.locator(".trend-card .chart")).toHaveAttribute(
+    "data-buckets",
+    "14",
+  );
+  await expect(
+    page
+      .locator(".trend-card .recharts-cartesian-axis-tick-value")
+      .filter({ hasText: /^\d+$/ }),
+  ).not.toHaveCount(0);
+  const ticks = await page
+    .locator(".trend-card .recharts-cartesian-axis-tick-value")
+    .filter({ hasText: /^\d+$/ })
+    .allTextContents();
+  expect(new Set(ticks).size).toBe(ticks.length);
+  await page.getByRole("button", { name: "Дни", exact: true }).click();
+  await expect(page.locator(".trend-card .recharts-line")).toHaveCount(2);
+  await expect(page.locator(".chart-dense-note")).toBeVisible();
+  await page.getByRole("button", { name: "Возвраты", exact: true }).click();
+  await expect(page.locator(".trend-card .recharts-line")).toHaveCount(1);
+  await expect(page.locator(".trend-card .chart")).toHaveAttribute(
+    "data-metric",
+    "returned",
+  );
+  await expect(
+    page.getByRole("heading", { name: "Товары не найдены", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Отмены", exact: true }).click();
+  await expect(page.locator("tbody tr")).toHaveCount(1);
+  await expect(
+    page.locator("tbody tr").first().locator("td").last(),
+  ).toHaveText("39");
+  await page
+    .getByRole("button", { name: "Заказано товаров", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Обзор продаж", exact: true }),
+  ).toBeVisible();
 });

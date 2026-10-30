@@ -140,3 +140,49 @@ test("unsupported workbook fails with actionable message", () => {
     /нет листа/,
   );
 });
+
+// Regression cases: selected metric and grouped price must not reuse revenue.
+test("metric product sets exclude unrelated zero values", async () => {
+  const { metricProducts, metricValue } =
+    await import("../src/data/metrics.js");
+  const products = getView(report, all).products;
+  const bought = metricProducts(products, "bought");
+  assert.ok(bought.every((p) => p.bought > 0));
+  assert.ok(bought.length < products.length);
+  const prices = metricProducts(products, "averagePrice");
+  assert.ok(prices.every((p) => p.orders > 0));
+  assert.equal(metricValue({ amount: 200, orders: 2 }, "averagePrice"), 100);
+  assert.equal(metricValue({ amount: 0, orders: 0 }, "averagePrice"), null);
+});
+test("weekly and monthly price uses volume weighting; missing days are not zero-priced sales", async () => {
+  const { chartBuckets } = await import("../src/data/metrics.js");
+  const days = [
+    { date: "2026-10-20", amount: 100, orders: 1 },
+    { date: "2026-10-21", amount: 4500, orders: 9 },
+    { date: "2026-10-22", amount: 0, orders: 0 },
+  ];
+  assert.equal(chartBuckets(days, "day")[2].averagePrice, null);
+  assert.equal(chartBuckets(days, "week")[0].averagePrice, 460);
+  assert.equal(chartBuckets(days, "month")[0].averagePrice, 460);
+  assert.equal(chartBuckets(days, "week")[0].startDate, "2026-10-20");
+  assert.equal(chartBuckets(days, "week")[0].endDate, "2026-10-22");
+});
+test("automatic scale and bucket counts keep long periods readable", async () => {
+  const { recommendedGroup, chartBuckets } =
+    await import("../src/data/metrics.js");
+  assert.equal(recommendedGroup(7), "day");
+  assert.equal(recommendedGroup(31), "day");
+  assert.equal(recommendedGroup(92), "week");
+  assert.equal(recommendedGroup(200), "month");
+  const v = getView(report, all),
+    buckets = chartBuckets(v.days, "week");
+  assert.equal(
+    buckets.reduce((s, d) => s + d.cancelled, 0),
+    450,
+  );
+  assert.equal(
+    buckets.reduce((s, d) => s + d.returned, 0),
+    14,
+  );
+  assert.equal(buckets.length, 14);
+});

@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo, useRef, useDeferredValue } from "react";
 import {
   AreaChart,
   Area,
-  BarChart,
+  ComposedChart,
+  Line,
   Bar,
   XAxis,
   YAxis,
@@ -37,7 +38,6 @@ import {
 import { gunzipSync, strFromU8 } from "fflate";
 import {
   getView,
-  groupDays,
   rangePreset,
   previousRange,
   ratio,
@@ -48,6 +48,15 @@ import {
   shortName,
 } from "./data/report.js";
 
+import {
+  metrics,
+  metricValue,
+  formatMetric,
+  metricProducts,
+  recommendedGroup,
+  chartBuckets,
+} from "./data/metrics.js";
+
 const tabs = ["Обзор", "Товары", "Воронка", "Качество"];
 const titles = [
   "Обзор продаж",
@@ -56,6 +65,7 @@ const titles = [
   "Качество заказов",
 ];
 const labels = {
+  averagePrice: "Средняя цена",
   amount: "Сумма заказов",
   orders: "Заказано товаров",
   bought: "Выкуплено",
@@ -66,7 +76,7 @@ const labels = {
   cart: "Добавления в корзину",
 };
 const defaults = { query: "", abc: "all", scheme: "all" };
-const displayValue = (key, n) => (key === "amount" ? money(n) : fmt(n));
+const displayValue = formatMetric;
 
 function Logo() {
   return (
@@ -104,18 +114,28 @@ function Empty({ text = "За этот период данных нет", reset 
     </div>
   );
 }
-function Tip({ active, payload, label, metric }) {
+function Tip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
+  const bucket = payload[0].payload;
+  const range =
+    bucket.startDate === bucket.endDate
+      ? dateLabel(bucket.startDate, {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        })
+      : `${dateLabel(bucket.startDate)} — ${dateLabel(bucket.endDate, { day: "numeric", month: "long", year: "numeric" })}`;
   return (
     <div className="chart-tooltip">
-      <span>
-        {dateLabel(label, { day: "numeric", month: "long", year: "numeric" })}
-      </span>
+      <span>{range}</span>
       {payload.map((p) => (
         <div key={p.dataKey}>
           <i style={{ background: p.color }} />
           {labels[p.dataKey]}
-          <strong>{displayValue(p.dataKey, p.value)}</strong>
+          <strong>
+            {displayValue(p.dataKey, p.value)}
+            {!["amount", "averagePrice"].includes(p.dataKey) && " шт."}
+          </strong>
         </div>
       ))}
     </div>
@@ -128,30 +148,42 @@ function Chart({
   height = 220,
   type = "area",
   quality = false,
-  onClick,
+  outcome = "all",
 }) {
-  const data = useMemo(() => groupDays(days, group), [days, group]);
-  const ChartTag = type === "bar" ? BarChart : AreaChart;
+  const data = useMemo(() => chartBuckets(days, group), [days, group]);
+  const currency = ["amount", "averagePrice"].includes(metric) && !quality;
+  const dense = data.length > 31;
+  const useBars = type === "bar" || data.length === 1;
+  const ChartTag = quality
+    ? ComposedChart
+    : useBars
+      ? ComposedChart
+      : AreaChart;
   const axisFormat = (v) =>
     Math.abs(v) >= 1e6
       ? `${fmt(v / 1e6, 1)} млн`
       : Math.abs(v) >= 1000
-        ? `${fmt(v / 1000, 0)} тыс.`
-        : fmt(v);
+        ? `${fmt(v / 1000, 1)} тыс.`
+        : fmt(v, currency ? 1 : 0);
   return (
-    <div style={{ height }} className="chart">
+    <div
+      style={{ height }}
+      className={`chart ${quality && dense ? "chart-dense" : ""}`}
+      data-group={group}
+      data-buckets={data.length}
+      data-metric={quality ? outcome : metric}
+    >
       <ResponsiveContainer width="100%" height="100%">
         <ChartTag
           data={data}
-          margin={{ top: 12, right: 15, left: 0, bottom: 0 }}
-          onClick={(state) =>
-            onClick && state?.activeLabel && onClick(state.activeLabel)
-          }
+          margin={{ top: 24, right: 14, left: 0, bottom: 4 }}
+          barCategoryGap="25%"
+          barGap={3}
         >
           <defs>
             <linearGradient id="orangeFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#ff742e" stopOpacity={0.22} />
-              <stop offset="100%" stopColor="#ff742e" stopOpacity={0.015} />
+              <stop offset="0%" stopColor="#ff742e" stopOpacity={0.2} />
+              <stop offset="100%" stopColor="#ff742e" stopOpacity={0.02} />
             </linearGradient>
           </defs>
           <CartesianGrid
@@ -172,26 +204,63 @@ function Chart({
           />
           <YAxis
             tickFormatter={axisFormat}
+            allowDecimals={currency}
+            domain={[0, "auto"]}
             axisLine={false}
             tickLine={false}
             tick={{ fill: "var(--muted)", fontSize: 11 }}
-            width={56}
+            width={63}
+            label={{
+              value: currency ? "₽" : "шт.",
+              position: "insideTopLeft",
+              offset: 0,
+              dy: -20,
+              fill: "var(--muted)",
+              fontSize: 10,
+            }}
           />
           <Tooltip
-            content={<Tip metric={metric} />}
-            cursor={{ stroke: "#ffb28b", strokeDasharray: "4 4" }}
+            content={<Tip />}
+            filterNull
+            cursor={
+              useBars || (quality && !dense)
+                ? { fill: "#f5f3f9" }
+                : { stroke: "#ffc19e", strokeDasharray: "4 4" }
+            }
           />
           {quality ? (
-            <>
-              <Bar dataKey="cancelled" fill="#ff7839" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="returned" fill="#343b52" radius={[4, 4, 0, 0]} />
-            </>
-          ) : type === "bar" ? (
+            ["cancelled", "returned"]
+              .filter((k) => outcome === "all" || outcome === k)
+              .map((k) =>
+                dense ? (
+                  <Line
+                    key={k}
+                    type="linear"
+                    dataKey={k}
+                    stroke={k === "cancelled" ? "#ff7839" : "#343b52"}
+                    strokeWidth={2.5}
+                    dot={false}
+                    activeDot={{ r: 5 }}
+                    isAnimationActive={false}
+                  />
+                ) : (
+                  <Bar
+                    key={k}
+                    dataKey={k}
+                    fill={k === "cancelled" ? "#ff7839" : "#343b52"}
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={28}
+                    isAnimationActive={false}
+                  />
+                ),
+              )
+          ) : useBars ? (
             <Bar
               dataKey={metric}
               fill="#ff7b39"
               radius={[5, 5, 0, 0]}
-              maxBarSize={40}
+              maxBarSize={42}
+              isAnimationActive={false}
             />
           ) : (
             <Area
@@ -199,8 +268,8 @@ function Chart({
               dataKey={metric}
               stroke="#ff7028"
               strokeWidth={2.5}
-              animationDuration={450}
               fill="url(#orangeFill)"
+              isAnimationActive={false}
               activeDot={{ r: 5, stroke: "#fff", strokeWidth: 3 }}
               dot={
                 data.length <= 12
@@ -211,6 +280,12 @@ function Chart({
           )}
         </ChartTag>
       </ResponsiveContainer>
+      {quality && dense && (
+        <p className="chart-dense-note">
+          Дневные значения показаны линиями. Для сравнения периодов выберите
+          недели или месяцы.
+        </p>
+      )}
     </div>
   );
 }
@@ -303,16 +378,26 @@ function Funnel({ total, expanded = false }) {
     </div>
   );
 }
-function Metric({ title, value, suffix, accent, children }) {
+function Metric({ title, value, suffix, active, onClick, children }) {
   return (
-    <Card className={`metric ${accent ? "accent" : ""}`}>
+    <button
+      type="button"
+      className={`card metric ${active ? "accent" : ""}`}
+      aria-pressed={active}
+      aria-label={title}
+      onClick={onClick}
+      title="Показать график и таблицу по этому показателю"
+    >
       <span>{title}</span>
       <div>
         {value}
         {suffix && <small>{suffix}</small>}
       </div>
       <p>{children || "\u00a0"}</p>
-    </Card>
+      <span className="metric-hint">
+        {active ? "Выбранный показатель" : "Показать данные ↗"}
+      </span>
+    </button>
   );
 }
 function Ring({ value }) {
@@ -413,14 +498,16 @@ function ProductTable({
   onAll,
   sort,
   onSort,
+  metric = "amount",
+  quality = false,
 }) {
   const [page, setPage] = useState(0);
   useEffect(() => setPage(0), [products, sort]);
   const sorted = useMemo(
     () =>
       [...products].sort((a, b) => {
-        const av = a[sort.key],
-          bv = b[sort.key];
+        const av = metricValue(a, sort.key) ?? 0,
+          bv = metricValue(b, sort.key) ?? 0;
         return (
           (typeof av === "string" ? av.localeCompare(bv, "ru") : av - bv) *
           (sort.dir === "asc" ? 1 : -1)
@@ -432,17 +519,35 @@ function ProductTable({
     maxPage = Math.max(0, Math.ceil(sorted.length / limit) - 1);
   const currentPage = Math.min(page, maxPage),
     visible = sorted.slice(currentPage * limit, (currentPage + 1) * limit);
+  const contextKey = metric === "orders" ? "amount" : "orders";
   const cols = [
     { key: "name", label: "Товар" },
     { key: "abc", label: "ABC" },
-    { key: "orders", label: "Заказано, шт." },
-    ...(!compact ? [{ key: "cancelled", label: "Отмены" }] : []),
-    { key: "amount", label: "Сумма заказов" },
+    {
+      key: contextKey,
+      label: contextKey === "amount" ? "Сумма заказов" : "Заказано, шт.",
+    },
+    ...(quality && metric !== "returned"
+      ? [{ key: "returned", label: "Возвращено, шт." }]
+      : []),
+    {
+      key: metric,
+      label: `${metrics[metric].label}${metrics[metric].unit === "шт." ? ", шт." : ""}`,
+    },
   ];
   return (
     <Card className="products-card">
       <div className="card-heading">
-        <h2>{compact ? "Топ товаров" : "Товары и показатели"}</h2>
+        <div>
+          <h2>
+            {quality ? "Товары с отменами и возвратами" : metrics[metric].table}
+          </h2>
+          <p className="table-context">
+            {quality
+              ? "Только товары с выбранными статусами"
+              : `Товары с ${metric === "averagePrice" ? "заказами" : "ненулевым показателем"} за выбранный период`}
+          </p>
+        </div>
         <div className="inline">
           <span className="chip">{fmt(products.length)} SKU</span>
           {compact && (
@@ -461,7 +566,16 @@ function ProductTable({
               <thead>
                 <tr>
                   {cols.map((c) => (
-                    <th key={c.key}>
+                    <th
+                      key={c.key}
+                      aria-sort={
+                        sort.key === c.key
+                          ? sort.dir === "desc"
+                            ? "descending"
+                            : "ascending"
+                          : "none"
+                      }
+                    >
                       <button
                         onClick={() => onSort(c.key)}
                         className={sort.key === c.key ? "sorted" : ""}
@@ -499,14 +613,18 @@ function ProductTable({
                     <td>
                       <span className={`abc abc-${p.abc}`}>{p.abc}</span>
                     </td>
-                    <td>{fmt(p.orders)}</td>
-                    {!compact && <td>{fmt(p.cancelled)}</td>}
                     <td>
+                      {displayValue(contextKey, metricValue(p, contextKey))}
+                    </td>
+                    {quality && metric !== "returned" && (
+                      <td>{fmt(p.returned)}</td>
+                    )}
+                    <td className="selected-metric-cell">
                       <button
                         className="amount-button"
                         onClick={() => onProduct(p.sku)}
                       >
-                        {money(p.amount)}
+                        {displayValue(metric, metricValue(p, metric))}
                       </button>
                     </td>
                   </tr>
@@ -584,9 +702,9 @@ function App() {
     [draftDates, setDraftDates] = useState({ start: "", end: "" });
   const [funnelMetric, setFunnelMetric] = useState("impressions");
   const [metric, setMetric] = useState("amount"),
-    [group, setGroup] = useState("day"),
-    [chartType, setChartType] = useState("area"),
-    [chartRange, setChartRange] = useState("7");
+    [group, setGroup] = useState("auto"),
+    [chartType, setChartType] = useState("area");
+  const [outcome, setOutcome] = useState("all");
   const [productSku, setProductSku] = useState(null),
     [info, setInfo] = useState(false),
     [importing, setImporting] = useState(false),
@@ -648,22 +766,35 @@ function App() {
     () => (report ? getView(report, effectiveFilters) : null),
     [report, effectiveFilters],
   );
-  const chartFilters = useMemo(() => {
-    if (!report) return effectiveFilters;
-    const d = new Date(filters.end + "T00:00:00Z");
-    d.setUTCDate(d.getUTCDate() - 6);
-    return {
-      ...effectiveFilters,
-      start:
-        chartRange === "7"
-          ? [filters.start, d.toISOString().slice(0, 10)].sort().at(-1)
-          : filters.start,
-    };
-  }, [report, effectiveFilters, chartRange]);
-  const chartView = useMemo(
-    () => (report ? getView(report, chartFilters) : null),
-    [report, chartFilters],
+  // One date range drives the cards, chart, and product table.
+  const chartFilters = effectiveFilters;
+  const chartView = view;
+  const effectiveGroup =
+    group === "auto" ? recommendedGroup(view?.days.length || 0) : group;
+  const tableProducts = useMemo(
+    () => (view ? metricProducts(view.products, metric) : []),
+    [view, metric],
   );
+  const qualityProducts = useMemo(
+    () =>
+      view?.products.filter((p) =>
+        outcome === "all" ? p.cancelled > 0 || p.returned > 0 : p[outcome] > 0,
+      ) || [],
+    [view, outcome],
+  );
+  const qualityMetric = outcome === "returned" ? "returned" : "cancelled";
+  function chooseMetric(key) {
+    setMetric(key);
+    setSort({ key, dir: "desc" });
+    if (tab === 2 || tab === 3) setTab(0);
+  }
+  function chooseOutcome(key) {
+    setOutcome(key);
+    setQualitySort({
+      key: key === "returned" ? "returned" : "cancelled",
+      dir: "desc",
+    });
+  }
   const previous = useMemo(() => {
     if (!report) return null;
     const prev = previousRange(chartFilters.start, chartFilters.end);
@@ -676,12 +807,17 @@ function App() {
     if (!view || !productSku) return [];
     const days = view.days.map((d) => ({
       date: d.date,
-      ...Object.fromEntries(Object.keys(labels).map((k) => [k, 0])),
+      ...Object.fromEntries(
+        Object.keys(labels)
+          .filter((k) => k !== "averagePrice")
+          .map((k) => [k, 0]),
+      ),
     }));
     const byDate = new Map(days.map((d) => [d.date, d]));
     for (const r of view.rows)
       if (r.sku === productSku)
-        for (const k of Object.keys(labels)) byDate.get(r.date)[k] += r[k];
+        for (const k of Object.keys(labels).filter((k) => k !== "averagePrice"))
+          byDate.get(r.date)[k] += r[k];
     return days;
   }, [view, productSku]);
   const update = (key, value) => setFilters((f) => ({ ...f, [key]: value }));
@@ -748,8 +884,9 @@ function App() {
         "Выкуплено, шт.",
         "Отменено, шт.",
         "Возвращено, шт.",
+        "Средняя цена, ₽",
       ],
-      ...view.products.map((p) => [
+      ...(tab === 3 ? qualityProducts : tableProducts).map((p) => [
         p.name,
         p.sku,
         p.article,
@@ -759,6 +896,7 @@ function App() {
         p.bought,
         p.cancelled,
         p.returned,
+        p.orders ? (p.amount / p.orders).toFixed(2).replace(".", ",") : "",
       ]),
     ];
     const escape = (v) => {
@@ -820,9 +958,14 @@ function App() {
   const total = view.total,
     buyout = ratio(total.bought, total.orders);
   const change =
-    previous?.total[metric] > 0
-      ? (chartView.total[metric] / previous.total[metric] - 1) * 100
+    previous && metricValue(previous.total, metric) > 0
+      ? (metricValue(chartView.total, metric) /
+          metricValue(previous.total, metric) -
+          1) *
+        100
       : null;
+  const chartDiscrepancy =
+    view.useSummary && report.discrepancies.find((d) => d.key === metric);
   const activeFilters =
     filters.query || filters.abc !== "all" || filters.scheme !== "all";
   return (
@@ -974,11 +1117,18 @@ function App() {
           </button>
         </div>
         <div className="metrics-grid">
-          <Metric title="Заказано на сумму" value={money(total.amount)} accent>
+          <Metric
+            title="Заказано на сумму"
+            value={money(total.amount)}
+            active={metric === "amount"}
+            onClick={() => chooseMetric("amount")}
+          >
             Включая отмены и возвраты
           </Metric>
           <Metric
             title="Заказано товаров"
+            active={metric === "orders"}
+            onClick={() => chooseMetric("orders")}
             value={fmt(total.orders)}
             suffix="шт."
           >
@@ -986,6 +1136,8 @@ function App() {
           </Metric>
           <Metric
             title="Выкуплено товаров"
+            active={metric === "bought"}
+            onClick={() => chooseMetric("bought")}
             value={fmt(total.bought)}
             suffix="шт."
           >
@@ -994,6 +1146,8 @@ function App() {
           </Metric>
           <Metric
             title="Средняя цена"
+            active={metric === "averagePrice"}
+            onClick={() => chooseMetric("averagePrice")}
             value={
               total.orders
                 ? money(Math.round(total.amount / total.orders))
@@ -1015,7 +1169,9 @@ function App() {
                   <div className="card-heading">
                     <div>
                       <h2>
-                        {tab === 3 ? "Отмены и возвраты" : "Заказы по дням"}
+                        {tab === 3
+                          ? "Отмены и возвраты"
+                          : metrics[metric].title}
                       </h2>
                       <p>
                         {dateLabel(chartFilters.start)} —{" "}
@@ -1026,18 +1182,20 @@ function App() {
                         })}
                       </p>
                     </div>
-                    <select
-                      aria-label="Период графика"
-                      className="pill-select"
-                      value={chartRange}
-                      onChange={(e) => setChartRange(e.target.value)}
-                    >
-                      <option value="7">Последние 7 дней</option>
-                      <option value="all">Весь выбранный период</option>
-                    </select>
+                    <span className="chip">
+                      {view.days.length} дн. ·{" "}
+                      {group === "auto" ? "автомасштаб" : "выбранный период"}
+                    </span>
                   </div>
                   <div className="chart-controls">
                     <div className="segmented">
+                      <button
+                        aria-pressed={group === "auto"}
+                        className={group === "auto" ? "selected" : ""}
+                        onClick={() => setGroup("auto")}
+                      >
+                        Авто
+                      </button>
                       <button
                         className={group === "day" ? "selected" : ""}
                         onClick={() => setGroup("day")}
@@ -1061,18 +1219,22 @@ function App() {
                       <select
                         aria-label="Показатель графика"
                         value={metric}
-                        onChange={(e) => setMetric(e.target.value)}
+                        onChange={(e) => chooseMetric(e.target.value)}
                       >
                         <option value="amount">Сумма заказов, ₽</option>
                         <option value="orders">Заказано, шт.</option>
                         <option value="bought">Выкуплено, шт.</option>
+                        <option value="averagePrice">Средняя цена, ₽</option>
                       </select>
                     )}
                   </div>
                   {tab === 0 && (
                     <div className="chart-summary">
                       <strong>
-                        {displayValue(metric, chartView.total[metric])}
+                        {displayValue(
+                          metric,
+                          metricValue(chartView.total, metric),
+                        )}
                       </strong>
                       {change != null && (
                         <span
@@ -1089,28 +1251,87 @@ function App() {
                       )}
                     </div>
                   )}
+                  {tab === 0 && chartDiscrepancy && (
+                    <p className="chart-reconciliation">
+                      График по детализации:{" "}
+                      {displayValue(metric, chartDiscrepancy.detail)}
+                      {metrics[metric].unit === "шт." ? " шт." : ""}. Итог Excel
+                      отличается —{" "}
+                      <button onClick={() => setInfo(true)}>почему?</button>
+                    </p>
+                  )}
                   {tab === 3 && (
-                    <div className="legend">
-                      <span>
-                        <i style={{ background: "#ff7839" }} />
-                        Отменено
-                      </span>
-                      <span>
-                        <i style={{ background: "#343b52" }} />
-                        Возвращено
-                      </span>
-                    </div>
+                    <>
+                      <div
+                        className="outcome-controls"
+                        aria-label="Статусы товаров"
+                      >
+                        {[
+                          ["all", "Все статусы"],
+                          ["cancelled", "Отмены"],
+                          ["returned", "Возвраты"],
+                        ].map(([key, title]) => (
+                          <button
+                            key={key}
+                            aria-pressed={outcome === key}
+                            className={outcome === key ? "selected" : ""}
+                            onClick={() => chooseOutcome(key)}
+                          >
+                            {title}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="quality-summary">
+                        <div>
+                          <span>Отменено за период</span>
+                          <strong>
+                            {fmt(total.cancelled)} <small>шт.</small>
+                          </strong>
+                          <em>
+                            {percent(ratio(total.cancelled, total.orders))} от
+                            заказанных
+                          </em>
+                        </div>
+                        <div>
+                          <span>Возвращено за период</span>
+                          <strong>
+                            {fmt(total.returned)} <small>шт.</small>
+                          </strong>
+                          <em>
+                            {percent(ratio(total.returned, total.orders))} от
+                            заказанных
+                          </em>
+                        </div>
+                      </div>
+                      <div className="legend">
+                        <span>
+                          <i style={{ background: "#ff7839" }} />
+                          Отменено
+                        </span>
+                        <span>
+                          <i style={{ background: "#343b52" }} />
+                          Возвращено
+                        </span>
+                      </div>
+                    </>
                   )}
                   <Chart
                     days={chartView.days}
                     metric={metric}
-                    group={group}
+                    group={effectiveGroup}
+                    outcome={outcome}
                     quality={tab === 3}
                     type={tab === 3 ? "bar" : chartType}
-                    height={215}
+                    height={tab === 3 ? 250 : 230}
                   />
                   <div className="chart-bottom">
-                    <span>Наведите на график, чтобы увидеть значения</span>
+                    <span>
+                      {effectiveGroup === "week"
+                        ? "По неделям · неполные недели учтены в выбранных датах"
+                        : effectiveGroup === "month"
+                          ? "По месяцам · только дни выбранного периода"
+                          : "Наведите на точку, чтобы увидеть значения"}
+                    </span>
                     {tab === 0 && (
                       <button
                         className="text-button"
@@ -1163,7 +1384,8 @@ function App() {
             {tab === 0 && (
               <div className="bottom-grid">
                 <ProductTable
-                  products={view.products}
+                  products={tableProducts}
+                  metric={metric}
                   compact
                   sort={sort}
                   onSort={onSort}
@@ -1175,7 +1397,8 @@ function App() {
             )}
             {tab === 1 && (
               <ProductTable
-                products={view.products}
+                products={tableProducts}
+                metric={metric}
                 sort={sort}
                 onSort={onSort}
                 onProduct={setProductSku}
@@ -1220,9 +1443,9 @@ function App() {
             )}
             {tab === 3 && (
               <ProductTable
-                products={[...view.products].filter(
-                  (p) => p.cancelled || p.returned,
-                )}
+                products={qualityProducts}
+                metric={qualityMetric}
+                quality
                 sort={qualitySort}
                 onSort={(key) =>
                   setQualitySort((s) => ({
