@@ -235,10 +235,12 @@ function Chart({
                 dense ? (
                   <Line
                     key={k}
-                    type="linear"
+                    type="bumpX"
                     dataKey={k}
                     stroke={k === "cancelled" ? "#ff7839" : "#343b52"}
                     strokeWidth={2.5}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                     dot={false}
                     activeDot={{ r: 5 }}
                     isAnimationActive={false}
@@ -264,10 +266,12 @@ function Chart({
             />
           ) : (
             <Area
-              type="linear"
+              type="bumpX"
               dataKey={metric}
               stroke="#ff7028"
               strokeWidth={2.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
               fill="url(#orangeFill)"
               isAnimationActive={false}
               activeDot={{ r: 5, stroke: "#fff", strokeWidth: 3 }}

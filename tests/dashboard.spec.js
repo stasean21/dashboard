@@ -237,3 +237,23 @@ test("quality long-range chart has useful buckets and status-linked tables; dail
     page.getByRole("heading", { name: "Обзор продаж", exact: true }),
   ).toBeVisible();
 });
+
+test("chart lines have rounded cubic bends in daily and weekly modes", async ({
+  page,
+}) => {
+  await ready(page);
+  const curve = page.locator(".trend-card .recharts-area-curve");
+  for (const mode of ["Дни", "Недели"]) {
+    await page.getByRole("button", { name: mode, exact: true }).click();
+    await expect(curve).toHaveAttribute("d", /C/);
+    const path = await curve.getAttribute("d");
+    expect(path).not.toMatch(/L/);
+    expect(await curve.getAttribute("stroke-linejoin")).toBe("round");
+  }
+  await page.getByRole("button", { name: "Качество", exact: true }).click();
+  await page.getByRole("button", { name: "Дни", exact: true }).click();
+  const lines = page.locator(".trend-card .recharts-line-curve");
+  await expect(lines).toHaveCount(2);
+  for (const line of await lines.all())
+    await expect(line).toHaveAttribute("d", /C/);
+});
