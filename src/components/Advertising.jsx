@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import Select from "./Select.jsx";
 import Dialog from "./Dialog.jsx";
+import ListProduct from "./ListProduct.jsx";
+import CopyValue from "./CopyValue.jsx";
 import {
   adMetricLabels,
   adToolLabels,
@@ -143,7 +145,12 @@ function AdTable({
       ) : (
         <>
           <div className="table-scroll">
-            <table>
+            <table className="dashboard-list advertising-list">
+              <colgroup>
+                {[41, 13, 15, 10, 11, 10].map((width, i) => (
+                  <col key={i} style={{ width: `${width}%` }} />
+                ))}
+              </colgroup>
               <thead>
                 <tr>
                   <th>
@@ -175,33 +182,37 @@ function AdTable({
                 {visible.map((row) => (
                   <tr key={kind === "campaigns" ? row.key : row.sku}>
                     <td>
-                      <button
-                        className="product-button"
-                        onClick={() => onRow(row)}
-                      >
-                        {kind !== "campaigns" &&
-                          (renderPhoto ? (
-                            renderPhoto(row.sku)
-                          ) : (
-                            <span className="product-icon">
-                              <Box size={20} />
-                            </span>
-                          ))}
-                        <span>
-                          <span className="product-name">
-                            {kind === "campaigns"
-                              ? row.name
-                              : shortName(row.name)}
-                          </span>
-                          <small>
-                            {kind === "campaigns"
-                              ? row.id === "0"
+                      {kind === "campaigns" ? (
+                        <button
+                          type="button"
+                          className="product-button"
+                          onClick={() => onRow(row)}
+                        >
+                          <span>
+                            <span className="product-name">{row.name}</span>
+                            <small>
+                              {row.id === "0"
                                 ? "Агрегат без разбивки по SKU"
-                                : adToolLabels[row.toolKey]
-                              : `SKU ${row.sku}`}
-                          </small>
-                        </span>
-                      </button>
+                                : adToolLabels[row.toolKey]}
+                            </small>
+                          </span>
+                        </button>
+                      ) : (
+                        <ListProduct
+                          name={shortName(row.name)}
+                          sku={row.sku}
+                          onOpen={() => onRow(row)}
+                          photo={
+                            renderPhoto ? (
+                              renderPhoto(row.sku)
+                            ) : (
+                              <span className="product-icon">
+                                <Box size={20} />
+                              </span>
+                            )
+                          }
+                        />
+                      )}
                     </td>
                     {columns.map(([key]) => (
                       <td
@@ -398,7 +409,12 @@ function ProductDetail({ product, report, onClose, renderPhoto }) {
       </p>
       {union.length > 0 && (
         <div className="table-scroll">
-          <table>
+          <table className="dashboard-list union-list">
+            <colgroup>
+              <col style={{ width: "60%" }} />
+              <col style={{ width: "25%" }} />
+              <col style={{ width: "15%" }} />
+            </colgroup>
             <thead>
               <tr>
                 <th>Купленный товар</th>
@@ -410,8 +426,11 @@ function ProductDetail({ product, report, onClose, renderPhoto }) {
               {union.map((r, i) => (
                 <tr key={i}>
                   <td>
-                    {shortName(r.name)}
-                    <small className="ad-sku">SKU {r.sku}</small>
+                    <span className="product-name">{shortName(r.name)}</span>
+                    <div className="list-product-identifiers">
+                      <span>SKU</span>
+                      <CopyValue value={r.sku} label="SKU Ozon" />
+                    </div>
                   </td>
                   <td>{money(r.sales)}</td>
                   <td>{fmt(r.units)}</td>

@@ -1,0 +1,640 @@
+/* Shared reading sizes for catalog, analytics and advertising lists. */
+:root {
+  --list-title-size: 19px;
+  --list-meta-size: 16px;
+  --list-header-size: 14px;
+  --list-control-size: 17px;
+  --list-text: #35435b;
+  --list-secondary: #65758e;
+}
+.dashboard-list {
+  width: 100%;
+  min-width: 1000px;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.dashboard-list th {
+  padding: 16px 14px;
+  font-size: var(--list-header-size);
+  font-weight: 600;
+  color: #7f8aa1;
+}
+.dashboard-list th button {
+  gap: 7px;
+  font: inherit;
+}
+.dashboard-list th button svg {
+  width: 15px;
+  height: 15px;
+}
+.dashboard-list th:first-child {
+  border-radius: 12px 0 0 12px;
+}
+.dashboard-list th:last-child {
+  border-radius: 0 12px 12px 0;
+}
+.dashboard-list td {
+  padding: 23px 14px;
+  font-size: var(--list-title-size);
+  color: #42516b;
+  font-weight: 500;
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+}
+.dashboard-list td:first-child {
+  width: auto;
+  white-space: normal;
+}
+.dashboard-list .selected-metric-cell,
+.dashboard-list .ad-number {
+  color: #303e57;
+  font-weight: 650;
+}
+.dashboard-list .amount-button {
+  font-size: var(--list-title-size);
+}
+.dashboard-list .product-button {
+  min-width: 0;
+  width: auto;
+  color: var(--list-text);
+  font-size: var(--list-title-size);
+  font-weight: 650;
+  line-height: 1.5;
+}
+.dashboard-list .product-button:hover {
+  color: #df743c;
+}
+.dashboard-list .product-name {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  max-width: none;
+  color: inherit;
+  font-size: var(--list-title-size);
+  font-weight: 650;
+  line-height: 1.5;
+}
+.dashboard-list .product-button small {
+  color: var(--list-secondary);
+  font-size: var(--list-meta-size);
+  font-weight: 450;
+  line-height: 1.6;
+  margin-top: 8px;
+}
+.list-product {
+  display: flex;
+  align-items: center;
+  gap: 17px;
+  min-width: 0;
+}
+.list-product > .product-photo,
+.list-product > .product-icon {
+  width: 48px;
+  aspect-ratio: 3/4;
+  height: auto;
+}
+.list-product-details {
+  min-width: 0;
+}
+.list-product-identifiers {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  color: #8490a6;
+  font-size: 15px;
+  font-weight: 450;
+  white-space: normal;
+}
+.dashboard-list .copy-id {
+  display: inline-flex;
+  justify-content: flex-start;
+  width: auto;
+  max-width: 100%;
+  padding: 4px;
+  gap: 7px;
+  color: #62708b;
+  border-radius: 8px;
+}
+.dashboard-list .copy-id .copy-value {
+  font-size: var(--list-meta-size);
+  font-weight: 600;
+  line-height: 1.25;
+}
+.dashboard-list .copy-id svg {
+  width: 15px;
+  height: 15px;
+}
+.dashboard-list .copy-id:hover,
+.dashboard-list .copy-id.copied {
+  background: #fff2e8;
+  border-color: #ffdcc5;
+  color: #d76c30;
+}
+.dashboard-list .copy-id:hover svg,
+.dashboard-list .copy-id.copied svg {
+  color: #e78049;
+}
+.dashboard-list .copy-feedback {
+  top: auto;
+  bottom: calc(100% + 5px);
+  right: 0;
+  padding: 7px 10px;
+  background: #252d41;
+  color: #fff;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 550;
+  z-index: 3;
+}
+.dashboard-list .abc {
+  font-size: 15px;
+  min-width: 31px;
+  height: 32px;
+}
+.dashboard-list .ad-sku {
+  font-size: var(--list-meta-size);
+}
+.ad-table-card .dashboard-list {
+  min-width: 1360px;
+}
+.union-list {
+  min-width: 900px;
+}
+.bottom-grid,
+.ad-bottom {
+  grid-template-columns: minmax(0, 1fr);
+}
+.products-card .card-heading,
+.ad-table-card .card-heading {
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+.products-card .card-heading h2,
+.ad-table-card .card-heading h2,
+.catalog-card .card-heading h2 {
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -0.6px;
+}
+.products-card .table-context,
+.ad-table-card .card-heading p,
+.catalog-card .card-heading p {
+  font-size: 15px;
+  color: #687991;
+  line-height: 1.6;
+}
+.products-card .chip,
+.ad-table-card .chip {
+  font-size: 15px;
+  padding: 8px 13px;
+}
+.products-card .card-heading .text-button,
+.ad-table-card .card-heading .text-button {
+  font-size: 16px;
+  color: #526784;
+}
+.pagination {
+  gap: 15px;
+  font-size: 15px;
+  color: #72819a;
+  margin-top: 23px;
+}
+.pagination .icon-button {
+  height: 34px;
+  width: 34px;
+}
+
+/* Search, tabs and the same larger menu rows in every section. */
+.ui-select,
+.filters .ui-select,
+.chart-controls > .ui-select,
+.ad-filter-selects .ui-select {
+  font-size: var(--list-control-size);
+}
+.ui-select-trigger {
+  min-height: 50px;
+  padding: 13px 15px;
+  color: #485a76;
+  gap: 16px;
+}
+.ui-select-trigger svg {
+  width: 18px;
+  height: 18px;
+  color: #697b96;
+}
+.ui-select-menu {
+  max-height: 340px;
+  max-width: min(400px, calc(100vw - 32px));
+  padding: 7px;
+  border-radius: 19px;
+}
+.ui-select .ui-select-menu [role="option"] {
+  min-height: 49px;
+  padding: 13px 15px;
+  font-size: var(--list-control-size);
+  font-weight: 500;
+  line-height: 1.5;
+  color: #65738d;
+  white-space: normal;
+  border-radius: 12px;
+}
+.ui-select .ui-select-menu [role="option"].chosen {
+  color: #df7b42;
+}
+.ui-select .ui-select-menu [role="option"] > svg {
+  width: 18px;
+  height: 18px;
+}
+.marketplace-select {
+  font-size: 14px;
+}
+.marketplace-select .ui-select-trigger {
+  padding: 0 15px 0 11px;
+  min-height: 44px;
+}
+.search-field,
+.catalog-toolbar .search-field {
+  width: 390px;
+  min-height: 52px;
+  padding: 13px 16px;
+  gap: 12px;
+  border-radius: 15px;
+  color: #6e7d97;
+}
+.search-field input {
+  font-size: 16px;
+  color: #34425b;
+}
+.search-field input::placeholder {
+  color: #64728c;
+}
+.search-field > svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+.filter-bar {
+  flex-wrap: wrap;
+  min-height: 58px;
+  gap: 21px;
+}
+.filters {
+  color: #53627c;
+}
+.filter-bar .text-button,
+.ad-filter-bar > .text-button,
+.ad-filter-selects .text-button {
+  font-size: 16px;
+  color: #536680;
+}
+.catalog-tabs {
+  border-radius: 34px;
+  padding: 5px;
+}
+.catalog-tabs button {
+  font-size: 17px;
+  padding: 12px 22px;
+  color: #56647e;
+  font-weight: 500;
+}
+.catalog-tabs button.active {
+  color: #29354c;
+  font-weight: 550;
+}
+.catalog-tabs small {
+  font-size: 14px;
+  color: #b9652c;
+  padding: 2px 6px;
+}
+.catalog-source-counts {
+  font-size: 15px;
+  color: #566780;
+  gap: 12px;
+}
+.catalog-source-counts > span {
+  padding: 10px 14px;
+  border-radius: 11px;
+}
+.catalog-toolbar {
+  margin: 27px 0 24px;
+}
+.catalog-context {
+  font-size: 15px;
+  color: #65738c;
+  gap: 9px;
+  line-height: 1.7;
+}
+.catalog-context > svg {
+  width: 18px;
+  height: 18px;
+}
+.catalog-checked-count {
+  font-size: 14px;
+  color: #708378;
+}
+.catalog-check-filters button {
+  font-size: 15px;
+  padding: 10px 14px;
+  color: #65758e;
+}
+.catalog-check-filters small {
+  font-size: 14px;
+}
+.ad-toolbar {
+  flex-wrap: wrap;
+  gap: 18px;
+}
+.ad-subnav {
+  flex-wrap: wrap;
+  border-radius: 32px;
+  padding: 5px;
+}
+.ad-subnav button {
+  font-size: 17px;
+  padding: 12px 20px;
+  color: #56647e;
+}
+.ad-period-note {
+  font-size: 15px;
+  line-height: 1.6;
+  color: #65758e;
+}
+.ad-filter-bar {
+  flex-wrap: wrap;
+  gap: 18px;
+}
+.ad-filter-bar > .search-field {
+  width: 330px;
+}
+
+/* Overview checks and other vertical lists use the same reading scale. */
+.catalog-summary {
+  min-height: 116px;
+  padding: 25px 28px;
+  gap: 28px;
+  border-radius: 26px;
+}
+.catalog-summary-title {
+  gap: 15px;
+}
+.catalog-summary-title .catalog-check-symbol {
+  width: 45px;
+  height: 45px;
+  border-radius: 14px;
+}
+.catalog-summary-title .catalog-check-symbol svg {
+  width: 26px;
+  height: 26px;
+}
+.catalog-summary h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #263249;
+}
+.catalog-summary p {
+  font-size: 16px;
+  color: #65758e;
+}
+.catalog-summary-groups button {
+  font-size: 16px;
+  color: #536783;
+  padding: 9px 22px;
+  gap: 12px;
+}
+.catalog-summary-groups small {
+  font-size: 15px;
+  color: #b9652c;
+}
+.catalog-summary > .text-button {
+  font-size: 16px;
+  color: #526784;
+}
+.catalog-summary > .text-button svg {
+  width: 19px;
+  height: 19px;
+}
+.funnel .step-main {
+  font-size: 19px;
+  color: #40516d;
+  font-weight: 550;
+  gap: 17px;
+}
+.funnel .step-main > strong {
+  font-size: 23px;
+  font-weight: 650;
+  color: #2e3c55;
+}
+.funnel .funnel-step {
+  padding: 15px 0;
+}
+.funnel .step-extra small {
+  font-size: 15px;
+  color: #72829d;
+  line-height: 1.6;
+}
+.funnel .fineprint,
+.funnel-page .method-note {
+  font-size: 15px;
+  color: #71819a;
+}
+.funnel.expanded .step-extra {
+  margin-left: 59px;
+}
+.funnel.expanded .funnel-track {
+  height: 10px;
+}
+.ad-budget-meta {
+  font-size: 17px;
+  color: #52647e;
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+.ad-budget-meta strong {
+  font-size: 19px;
+  color: #35435b;
+}
+.ad-budget-meta small {
+  font-size: 15px;
+  color: #6a7b93;
+}
+.ad-tool-row,
+.ad-tool-row strong {
+  font-size: 16px;
+  color: #52647e;
+}
+.ad-tool-row {
+  flex-wrap: wrap;
+}
+.ad-model-row {
+  font-size: 16px;
+  color: #65758e;
+  flex-wrap: wrap;
+}
+.ad-model-row small {
+  font-size: 15px;
+}
+.quality-numbers span,
+.insights .legend {
+  font-size: 15px;
+  color: #65758e;
+}
+.concentration p {
+  font-size: 17px;
+}
+.concentration > div > span {
+  font-size: 16px;
+  display: block;
+  overflow: visible;
+  color: #65758e;
+}
+.catalog-alert-list > button strong {
+  font-size: 16px;
+  line-height: 1.5;
+}
+.catalog-alert-list > button small {
+  font-size: 14px;
+}
+.link-picker-options strong {
+  font-size: 17px;
+}
+.link-picker-options small {
+  font-size: 15px;
+  color: #71819a;
+}
+
+@media (max-width: 1200px) {
+  .ad-filter-bar > .search-field {
+    margin-left: 0;
+  }
+  .funnel-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 760px) {
+  .search-field,
+  .catalog-toolbar .search-field {
+    min-width: 0;
+    width: 100%;
+  }
+  .filters {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .filter-bar .export-button {
+    margin-left: 0;
+  }
+  .filters label {
+    border: 0;
+  }
+  .ui-select-trigger {
+    padding: 12px 13px;
+    gap: 10px;
+    max-width: 100%;
+  }
+  .chart-controls > .ui-select {
+    max-width: 100%;
+  }
+  .marketplace-select {
+    font-size: 12px;
+  }
+  .marketplace-select .ui-select-trigger {
+    min-height: 34px;
+    padding: 0 10px;
+  }
+  .catalog-tabs {
+    width: 100%;
+  }
+  .catalog-tabs button {
+    font-size: 17px;
+    padding: 12px 15px;
+  }
+  .catalog-toolbar {
+    gap: 16px;
+  }
+  .catalog-summary {
+    padding: 22px;
+    gap: 18px;
+  }
+  .catalog-summary-title {
+    min-width: 0;
+  }
+  .catalog-summary-groups {
+    justify-content: flex-start;
+    gap: 4px;
+  }
+  .catalog-summary-groups button {
+    border: 0;
+    padding: 9px 0;
+    margin-right: 12px;
+  }
+  .catalog-summary > .text-button {
+    margin-left: 0;
+  }
+  .ad-subnav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+  .ad-subnav button {
+    font-size: 17px;
+    padding: 12px 9px;
+  }
+  .ad-filter-selects {
+    flex-wrap: wrap;
+  }
+  .ad-filter-bar > .search-field {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+  .products-card .card-heading,
+  .ad-table-card .card-heading {
+    align-items: flex-start;
+  }
+  .products-card .card-heading > .inline {
+    justify-content: flex-start;
+  }
+  .pagination {
+    flex-wrap: wrap;
+  }
+  .dashboard-list {
+    min-width: 880px;
+  }
+  .dashboard-list col:first-child {
+    width: 260px !important;
+  }
+  .dashboard-list col:not(:first-child) {
+    width: 180px !important;
+  }
+  .dashboard-list .product-name {
+    font-size: 19px;
+  }
+  .ad-table-card .dashboard-list {
+    min-width: 1160px;
+  }
+  .union-list {
+    min-width: 620px;
+  }
+  .funnel .step-main {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .overview-grid > .gauge-card,
+  .overview-grid > .funnel-card {
+    grid-column: 1 / -1;
+  }
+  .funnel .step-main > strong {
+    margin-left: auto;
+  }
+  .funnel.expanded .step-extra {
+    margin-left: 0;
+  }
+  .ad-budget-meta strong {
+    white-space: normal;
+  }
+}

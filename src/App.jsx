@@ -65,6 +65,7 @@ import { checksForMarket, offerId } from "./data/catalog.js";
 import ProductCatalog, { CatalogTabs } from "./components/ProductCatalog.jsx";
 import CatalogProduct from "./components/CatalogProduct.jsx";
 import ProductPhoto from "./components/ProductPhoto.jsx";
+import ListProduct from "./components/ListProduct.jsx";
 import {
   CatalogAlert,
   CatalogSummary,
@@ -562,7 +563,7 @@ function ProductTable({
     },
   ];
   return (
-    <Card className="products-card">
+    <Card className={`products-card ${compact ? "compact-products" : ""}`}>
       <div className="card-heading">
         <div>
           <h2>
@@ -598,7 +599,17 @@ function ProductTable({
       ) : (
         <>
           <div className="table-scroll">
-            <table>
+            <table
+              className={`dashboard-list ${quality ? "quality-list" : "sales-list"}`}
+            >
+              <colgroup>
+                {(quality && metric !== "returned"
+                  ? [53, 8, 13, 13, 13]
+                  : [55, 9, 15, 21]
+                ).map((width, i) => (
+                  <col key={i} style={{ width: `${width}%` }} />
+                ))}
+              </colgroup>
               <thead>
                 <tr>
                   {cols.map((c) => (
@@ -627,28 +638,21 @@ function ProductTable({
                 {visible.map((p) => (
                   <tr key={p.sku}>
                     <td>
-                      <button
-                        className="product-button"
-                        onClick={() => onProduct(p.sku)}
-                      >
-                        {renderPhoto ? (
-                          renderPhoto(p.sku)
-                        ) : (
-                          <span className="product-icon">
-                            <Box size={21} />
-                          </span>
-                        )}
-                        <span>
-                          <span className="product-name">
-                            {shortName(p.name)}
-                          </span>
-                          {!compact && (
-                            <small>
-                              SKU {p.sku} · {p.article}
-                            </small>
-                          )}
-                        </span>
-                      </button>
+                      <ListProduct
+                        name={shortName(p.name)}
+                        sku={p.sku}
+                        article={p.article}
+                        onOpen={() => onProduct(p.sku)}
+                        photo={
+                          renderPhoto ? (
+                            renderPhoto(p.sku)
+                          ) : (
+                            <span className="product-icon">
+                              <Box size={21} />
+                            </span>
+                          )
+                        }
+                      />
                     </td>
                     <td>
                       <span className={`abc abc-${p.abc}`}>{p.abc}</span>
