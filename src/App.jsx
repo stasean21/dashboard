@@ -59,6 +59,11 @@ import Select from "./components/Select.jsx";
 import Dialog from "./components/Dialog.jsx";
 import Advertising, { AdvertisingMethod } from "./components/Advertising.jsx";
 import DateRangePicker from "./components/DateRangePicker.jsx";
+import MarketplaceSwitcher, {
+  MarketplaceEmpty,
+  marketplaces,
+  savedMarketplace,
+} from "./components/MarketplaceSwitcher.jsx";
 
 const tabs = ["Обзор", "Товары", "Воронка", "Качество", "Реклама"];
 const titles = [
@@ -91,7 +96,7 @@ function Logo() {
       </svg>
       <div>
         <span>FORMULA</span>
-        <small>Ozon · аналитика магазина</small>
+        <small>Аналитика маркетплейсов</small>
       </div>
     </div>
   );
@@ -687,6 +692,8 @@ function ProductTable({
   );
 }
 function App() {
+  const [marketplace, setMarketplace] = useState(savedMarketplace);
+  const hasMarketplaceData = marketplace === "ozon" || marketplace === "all";
   const [report, setReport] = useState(null),
     [loadError, setLoadError] = useState("");
   const [adsReport, setAdsReport] = useState(null),
@@ -714,6 +721,20 @@ function App() {
   const inputRef = useRef(),
     workerRef = useRef();
   const deferredQuery = useDeferredValue(filters.query);
+  useEffect(() => {
+    try {
+      localStorage.setItem("formula.marketplace", marketplace);
+    } catch {
+      // Switching still works when browser storage is unavailable.
+    }
+  }, [marketplace]);
+  function changeMarketplace(next) {
+    setMarketplace(next);
+    setProductSku(null);
+    setInfo(false);
+    setPeriodOpen(false);
+    setToast("");
+  }
   const effectiveFilters = useMemo(
     () => ({ ...filters, query: deferredQuery }),
     [filters, deferredQuery],
@@ -855,6 +876,10 @@ function App() {
     setFilters({ ...defaults, start: report.minDate, end: report.maxDate });
   async function importFile(file) {
     if (!file) return;
+    if (report && !hasMarketplaceData) {
+      setToast(`Импорт ${marketplaces[marketplace].name} пока не подключён.`);
+      return;
+    }
     if (!/\.xlsx$/i.test(file.name)) {
       setToast(
         "Поддерживается Excel .xlsx — отчёт Ozon по товарам или аналитика продвижения.",
@@ -878,6 +903,7 @@ function App() {
       worker.onmessage = ({ data }) => {
         if (data.progress != null) setProgress(data.progress);
         if (data.report) {
+          setMarketplace((current) => (current === "all" ? "all" : "ozon"));
           if (data.report.kind === "advertising") {
             adsImportedRef.current = true;
             setAdsReport(data.report);
@@ -1031,6 +1057,11 @@ function App() {
           >
             <CircleHelp size={20} />
           </button>
+          <MarketplaceSwitcher
+            value={marketplace}
+            onChange={changeMarketplace}
+          />
+          <span className="marketplace-profile-divider" aria-hidden="true" />
           <span className="avatar" title={report.seller}>
             {report.seller.slice(0, 1)}
           </span>
@@ -1039,7 +1070,13 @@ function App() {
       <main>
         <div className="page-heading">
           <div>
-            <div className="eyebrow">ВАШ МАГАЗИН · {report.seller}</div>
+            <div className="eyebrow">
+              {marketplace === "all"
+                ? "ВСЕ ПЛОЩАДКИ"
+                : marketplaces[marketplace].name.toLocaleUpperCase("ru")}
+              {" · "}
+              {report.seller}
+            </div>
             <h1>{titles[tab]}</h1>
             <p>
               {tab === 0
@@ -1053,50 +1090,68 @@ function App() {
                       : "Выкуп, отмены и возвраты под контролем"}
             </p>
           </div>
-          <div className="page-actions">
-            {tab === 4 ? (
-              <span
-                className="button ad-report-period"
-                title="В файле итоги за весь период; разбивки по дням нет"
-              >
-                <CalendarDays size={17} />
-                {adsReport
-                  ? `${dateLabel(adsReport.start, { day: "2-digit", month: "2-digit" })} — ${dateLabel(adsReport.end, { day: "2-digit", month: "2-digit", year: "numeric" })}`
-                  : "Рекламный отчёт"}
-              </span>
-            ) : (
-              <>
-                <button
-                  className="button date-button"
-                  onClick={() => {
-                    setPeriodOpen(true);
-                  }}
+          {hasMarketplaceData && (
+            <div className="page-actions">
+              {tab === 4 ? (
+                <span
+                  className="button ad-report-period"
+                  title="В файле итоги за весь период; разбивки по дням нет"
                 >
                   <CalendarDays size={17} />
-                  {dateLabel(filters.start, {
-                    day: "2-digit",
-                    month: "2-digit",
-                  })}{" "}
-                  —{" "}
-                  {dateLabel(filters.end, {
-                    day: "2-digit",
-                    month: "2-digit",
-                    year: "numeric",
-                  })}
-                  <ChevronDown size={14} />
-                </button>
-              </>
-            )}
-            <button
-              className="button upload-button"
-              disabled={importing}
-              onClick={() => inputRef.current.click()}
-            >
-              <Upload size={16} />
-              {importing ? `${progress}%` : "Загрузить Excel"}
-            </button>
-          </div>
+                  {adsReport
+                    ? `${dateLabel(adsReport.start, { day: "2-digit", month: "2-digit" })} — ${dateLabel(adsReport.end, { day: "2-digit", month: "2-digit", year: "numeric" })}`
+                    : "Рекламный отчёт"}
+                </span>
+              ) : (
+                <>
+                  <button
+                    className="button date-button"
+                    onClick={() => {
+                      setPeriodOpen(true);
+                    }}
+                  >
+                    <CalendarDays size={17} />
+                    {dateLabel(filters.start, {
+                      day: "2-digit",
+                      month: "2-digit",
+                    })}{" "}
+                    —{" "}
+                    {dateLabel(filters.end, {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                    })}
+                    <ChevronDown size={14} />
+                  </button>
+                </>
+              )}
+              <button
+                className="button upload-button"
+                disabled={importing}
+                title={
+                  marketplace === "all" ? "Загрузить отчёт Ozon" : undefined
+                }
+                onClick={() => inputRef.current.click()}
+              >
+                <Upload size={16} />
+                {importing
+                  ? `${progress}%`
+                  : marketplace === "all"
+                    ? "Загрузить Excel Ozon"
+                    : "Загрузить Excel"}
+              </button>
+            </div>
+          )}
         </div>
+        {marketplace === "all" && (
+          <div className="marketplace-coverage" role="note">
+            <Info size={15} />
+            <span>
+              Сейчас в общем режиме доступен только Ozon. Данные Wildberries и
+              Яндекс Маркета ещё не подключены.
+            </span>
+          </div>
+        )}
         <input
           hidden
           ref={inputRef}
@@ -1107,7 +1162,13 @@ function App() {
             e.target.value = "";
           }}
         />
-        {tab === 4 ? (
+        {!hasMarketplaceData ? (
+          <MarketplaceEmpty
+            name={marketplaces[marketplace].name}
+            section={tabs[tab]}
+            onOzon={() => changeMarketplace("ozon")}
+          />
+        ) : tab === 4 ? (
           <Advertising
             report={adsReport}
             loading={adsLoading}
@@ -1558,7 +1619,7 @@ function App() {
           </>
         )}
       </main>
-      {periodOpen && (
+      {hasMarketplaceData && periodOpen && (
         <DateRangePicker
           report={report}
           value={{ start: filters.start, end: filters.end }}
@@ -1569,7 +1630,7 @@ function App() {
           }}
         />
       )}
-      {selectedProduct && (
+      {hasMarketplaceData && selectedProduct && (
         <Dialog
           title="Карточка товара"
           wide
@@ -1624,11 +1685,24 @@ function App() {
       )}
       {info && (
         <Dialog
-          title={tab === 4 ? "О рекламных данных" : "О данных и расчётах"}
+          title={
+            !hasMarketplaceData
+              ? `О данных ${marketplaces[marketplace].name}`
+              : tab === 4
+                ? "О рекламных данных"
+                : "О данных и расчётах"
+          }
           wide
           onClose={() => setInfo(false)}
         >
-          {tab === 4 ? (
+          {!hasMarketplaceData ? (
+            <div className="info-content">
+              <p>
+                Отчёты {marketplaces[marketplace].name} пока не подключены.
+                Данные появятся после добавления источника этой площадки.
+              </p>
+            </div>
+          ) : tab === 4 ? (
             <AdvertisingMethod report={adsReport} />
           ) : (
             <div className="info-content">

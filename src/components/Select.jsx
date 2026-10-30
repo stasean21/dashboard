@@ -7,6 +7,7 @@ export default function Select({
   onChange,
   options,
   className = "",
+  renderValue,
 }) {
   const [open, setOpen] = useState(false),
     [index, setIndex] = useState(0);
@@ -101,7 +102,7 @@ export default function Select({
         onClick={toggle}
         onKeyDown={keydown}
       >
-        <span>{selected.label}</span>
+        <span>{renderValue ? renderValue(selected) : selected.label}</span>
         <ChevronDown size={14} />
       </button>
       {open && (
