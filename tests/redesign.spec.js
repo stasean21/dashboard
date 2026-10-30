@@ -58,7 +58,7 @@ test("quality infinite scroll resets for search and sorting; dark panel and smoo
     .click();
   await expect(page.locator(".quality-buyout")).toHaveClass(/dark-panel/);
   await expect(page.locator(".quality-buyout .gauge>strong")).toHaveText(
-    "82,19%",
+    "82,34%",
   );
   await grows(page, ".quality-list tbody tr");
   await page.getByLabel("Поиск товаров", { exact: true }).fill("5330035142");
@@ -86,9 +86,9 @@ test("funnel grouping changes buckets while growth list uses current filters and
   await expect(page.locator(".page-stat-grid .dashboard-stat")).toHaveCount(4);
   const chart = page.locator(".funnel-dynamics .chart");
   await page.getByRole("button", { name: "Дни", exact: true }).click();
-  await expect(chart).toHaveAttribute("data-buckets", "92");
+  await expect(chart).toHaveAttribute("data-buckets", "361");
   await page.getByRole("button", { name: "Месяцы", exact: true }).click();
-  await expect(chart).toHaveAttribute("data-buckets", "4");
+  await expect(chart).toHaveAttribute("data-buckets", "12");
   const rows = page.locator(".growth-table tbody tr");
   await expect(rows).toHaveCount(5);
   await grows(page, ".growth-table tbody tr");

@@ -9,6 +9,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  Cell,
 } from "recharts";
 import {
   Upload,
@@ -32,6 +33,11 @@ import {
   TriangleAlert,
   ChartNoAxesColumn,
   CircleHelp,
+  Wallet,
+  ShoppingBag,
+  Check,
+  Trophy,
+  Target,
 } from "lucide-react";
 import { gunzipSync, strFromU8 } from "fflate";
 import {
@@ -56,6 +62,8 @@ import {
 
 import InfiniteList, { useInfiniteList } from "./components/InfiniteList.jsx";
 import { PanelTitle, StatCard } from "./components/DashboardUI.jsx";
+import Overview from "./components/Overview.jsx";
+import { growthProducts } from "./data/overview.js";
 import Select from "./components/Select.jsx";
 import Dialog from "./components/Dialog.jsx";
 import Advertising, { AdvertisingMethod } from "./components/Advertising.jsx";
@@ -174,6 +182,11 @@ function Chart({
 }) {
   const data = useMemo(() => chartBuckets(days, group), [days, group]);
   const currency = ["amount", "averagePrice"].includes(metric) && !quality;
+  const peakIndex = data.reduce(
+    (best, row, i) =>
+      (row[metric] ?? 0) > (data[best]?.[metric] ?? 0) ? i : best,
+    0,
+  );
   const dense = data.length > 31;
   const useBars = type === "bar" || data.length === 1;
   const ChartTag = quality
@@ -284,11 +297,19 @@ function Chart({
           ) : useBars ? (
             <Bar
               dataKey={metric}
-              fill="#ff7b39"
-              radius={[5, 5, 0, 0]}
-              maxBarSize={42}
+              fill="#606578"
+              radius={[30, 30, 30, 30]}
+              maxBarSize={58}
+              background={{ fill: "#f3f1f7", radius: 30 }}
               isAnimationActive={false}
-            />
+            >
+              {data.map((row, i) => (
+                <Cell
+                  key={row.date}
+                  fill={i === peakIndex ? "#ff8d43" : "#606578"}
+                />
+              ))}
+            </Bar>
           ) : (
             <Area
               type="bumpX"
@@ -412,6 +433,13 @@ function Funnel({ total, expanded = false }) {
   );
 }
 function Metric({ title, value, suffix, active, onClick, children }) {
+  const Icon =
+    {
+      "Заказано на сумму": Wallet,
+      "Заказано товаров": ShoppingBag,
+      "Выкуплено товаров": Check,
+      "Средняя цена": ChartNoAxesColumn,
+    }[title] || Box;
   return (
     <button
       type="button"
@@ -421,7 +449,12 @@ function Metric({ title, value, suffix, active, onClick, children }) {
       onClick={onClick}
       title="Показать график и таблицу по этому показателю"
     >
-      <span>{title}</span>
+      <span className="metric-title">
+        {title}
+        <span className="dashboard-icon">
+          <Icon size={21} />
+        </span>
+      </span>
       <div>
         {value}
         {suffix && <small>{suffix}</small>}
@@ -527,6 +560,7 @@ function Insights({ view, onQuality }) {
 function ProductTable({
   products,
   compact = false,
+  leaders = false,
   onProduct,
   onAll,
   sort,
@@ -549,34 +583,59 @@ function ProductTable({
     [products, sort],
   );
   const scrolling = useInfiniteList(sorted, 12);
-  const visible = compact ? sorted.slice(0, 4) : scrolling.visible;
+  const visible = compact
+    ? sorted.slice(0, leaders ? 5 : 4)
+    : scrolling.visible;
   const contextKey = metric === "orders" ? "amount" : "orders";
-  const cols = [
-    { key: "name", label: "Товар" },
-    { key: "abc", label: "ABC" },
-    {
-      key: contextKey,
-      label: contextKey === "amount" ? "Сумма заказов" : "Заказано, шт.",
-    },
-    ...(quality && metric !== "returned"
-      ? [{ key: "returned", label: "Возвращено, шт." }]
-      : []),
-    {
-      key: metric,
-      label: `${metrics[metric].label}${metrics[metric].unit === "шт." ? ", шт." : ""}`,
-    },
-  ];
+  const cols = leaders
+    ? [
+        { key: "name", label: "Товар" },
+        { key: metric, label: metrics[metric].label },
+      ]
+    : [
+        { key: "name", label: "Товар" },
+        { key: "abc", label: "ABC" },
+        {
+          key: contextKey,
+          label: contextKey === "amount" ? "Сумма заказов" : "Заказано, шт.",
+        },
+        ...(quality && metric !== "returned"
+          ? [{ key: "returned", label: "Возвращено, шт." }]
+          : []),
+        {
+          key: metric,
+          label: `${metrics[metric].label}${metrics[metric].unit === "шт." ? ", шт." : ""}`,
+        },
+      ];
   return (
-    <Card className={`products-card ${compact ? "compact-products" : ""}`}>
+    <Card
+      className={`products-card ${compact ? "compact-products" : ""} ${leaders ? "leaders-card" : ""}`}
+    >
       <div className="card-heading">
         <div>
+          {leaders && (
+            <div className="panel-eyebrow">
+              <span className="dashboard-icon">
+                <Trophy size={19} />
+              </span>
+              <span>Ассортимент в цифрах</span>
+            </div>
+          )}
           <h2>
-            {quality ? "Товары с отменами и возвратами" : metrics[metric].table}
+            {leaders
+              ? sort.key === metric && sort.dir === "desc"
+                ? "Пять лидеров"
+                : "Пять товаров"
+              : quality
+                ? "Товары с отменами и возвратами"
+                : metrics[metric].table}
           </h2>
           <p className="table-context">
-            {quality
-              ? "Только товары с выбранными статусами"
-              : `Товары с ${metric === "averagePrice" ? "заказами" : "ненулевым показателем"} за выбранный период`}
+            {leaders
+              ? metrics[metric].table
+              : quality
+                ? "Только товары с выбранными статусами"
+                : `Товары с ${metric === "averagePrice" ? "заказами" : "ненулевым показателем"} за выбранный период`}
           </p>
         </div>
         <div className="inline">
@@ -607,9 +666,11 @@ function ProductTable({
               className={`dashboard-list ${quality ? "quality-list" : "sales-list"}`}
             >
               <colgroup>
-                {(quality && metric !== "returned"
-                  ? [53, 8, 13, 13, 13]
-                  : [55, 9, 15, 21]
+                {(leaders
+                  ? [73, 27]
+                  : quality && metric !== "returned"
+                    ? [53, 8, 13, 13, 13]
+                    : [55, 9, 15, 21]
                 ).map((width, i) => (
                   <col key={i} style={{ width: `${width}%` }} />
                 ))}
@@ -639,7 +700,7 @@ function ProductTable({
                 </tr>
               </thead>
               <tbody>
-                {visible.map((p) => (
+                {visible.map((p, index) => (
                   <tr key={p.sku}>
                     <td>
                       <ListProduct
@@ -648,7 +709,9 @@ function ProductTable({
                         article={p.article}
                         onOpen={() => onProduct(p.sku)}
                         photo={
-                          renderPhoto ? (
+                          leaders ? (
+                            <span className="leader-rank">{index + 1}</span>
+                          ) : renderPhoto ? (
                             renderPhoto(p.sku)
                           ) : (
                             <span className="product-icon">
@@ -657,13 +720,26 @@ function ProductTable({
                           )
                         }
                       />
+                      {leaders && (
+                        <div className="leader-track">
+                          <span
+                            style={{
+                              width: `${ratio(metricValue(p, metric) || 0, Math.max(1, ...sorted.map((item) => metricValue(item, metric) || 0)))}%`,
+                            }}
+                          />
+                        </div>
+                      )}
                     </td>
-                    <td>
-                      <span className={`abc abc-${p.abc}`}>{p.abc}</span>
-                    </td>
-                    <td>
-                      {displayValue(contextKey, metricValue(p, contextKey))}
-                    </td>
+                    {!leaders && (
+                      <>
+                        <td>
+                          <span className={`abc abc-${p.abc}`}>{p.abc}</span>
+                        </td>
+                        <td>
+                          {displayValue(contextKey, metricValue(p, contextKey))}
+                        </td>
+                      </>
+                    )}
                     {quality && metric !== "returned" && (
                       <td>{fmt(p.returned)}</td>
                     )}
@@ -680,6 +756,24 @@ function ProductTable({
               </tbody>
             </table>
           </div>
+          {leaders && metric !== "averagePrice" && (
+            <p className="overview-note">
+              Эти товары дают{" "}
+              {percent(
+                ratio(
+                  visible.reduce(
+                    (sum, p) => sum + (metricValue(p, metric) || 0),
+                    0,
+                  ),
+                  sorted.reduce(
+                    (sum, p) => sum + (metricValue(p, metric) || 0),
+                    0,
+                  ),
+                ),
+              )}{" "}
+              показателя по детализации выбранного периода.
+            </p>
+          )}
           {!compact && (
             <InfiniteList
               shown={visible.length}
@@ -694,13 +788,7 @@ function ProductTable({
   );
 }
 function GrowthList({ products, onProduct, renderPhoto }) {
-  const rows = useMemo(
-    () =>
-      products
-        .filter((p) => p.visits >= 100 && p.orders === 0)
-        .sort((a, b) => b.visits - a.visits),
-    [products],
-  );
+  const rows = useMemo(() => growthProducts(products), [products]);
   const { visible, more, load } = useInfiniteList(rows, 5);
   return (
     <Card className="growth-list">
@@ -908,7 +996,7 @@ function App() {
     [periodOpen, setPeriodOpen] = useState(false);
   const [metric, setMetric] = useState("amount"),
     [group, setGroup] = useState("auto"),
-    [chartType, setChartType] = useState("area");
+    [chartType, setChartType] = useState("bar");
   const [outcome, setOutcome] = useState("all");
   const [productSku, setProductSku] = useState(null),
     [info, setInfo] = useState(false),
@@ -1387,6 +1475,10 @@ function App() {
                 {dateLabel(filters.start, {
                   day: "2-digit",
                   month: "2-digit",
+                  year:
+                    filters.start.slice(0, 4) !== filters.end.slice(0, 4)
+                      ? "numeric"
+                      : undefined,
                 })}{" "}
                 —{" "}
                 {dateLabel(filters.end, {
@@ -1650,18 +1742,35 @@ function App() {
                 )}
                 {(tab === 0 || tab === 3) && (
                   <div
-                    className={`overview-grid ${tab === 3 ? "quality-grid" : ""}`}
+                    className={`overview-grid ${tab === 3 ? "quality-grid" : "overview-main-grid"}`}
                   >
                     <Card className="trend-card">
                       <div className="card-heading">
                         <div>
+                          {tab === 0 && (
+                            <div className="panel-eyebrow">
+                              <span className="dashboard-icon">
+                                <ChartNoAxesColumn size={19} />
+                              </span>
+                              <span>Заказанные товары</span>
+                            </div>
+                          )}
                           <h2>
                             {tab === 3
                               ? "Отмены и возвраты"
-                              : metrics[metric].title}
+                              : "Динамика продаж"}
                           </h2>
                           <p>
-                            {dateLabel(chartFilters.start)} —{" "}
+                            {dateLabel(chartFilters.start, {
+                              day: "numeric",
+                              month: "short",
+                              year:
+                                chartFilters.start.slice(0, 4) !==
+                                chartFilters.end.slice(0, 4)
+                                  ? "numeric"
+                                  : undefined,
+                            })}{" "}
+                            —{" "}
                             {dateLabel(chartFilters.end, {
                               day: "numeric",
                               month: "long",
@@ -1822,56 +1931,100 @@ function App() {
                     <Card
                       className={`gauge-card ${tab === 3 ? "dark-panel quality-buyout" : ""}`}
                     >
+                      {tab === 0 && (
+                        <div className="panel-eyebrow">
+                          <span className="dashboard-icon">
+                            <Target size={19} />
+                          </span>
+                          <span>Качество заказов</span>
+                        </div>
+                      )}
                       <div className="card-heading">
-                        <h2>Процент выкупа</h2>
+                        <h2>
+                          {tab === 0 ? "Выкуп и статусы" : "Процент выкупа"}
+                        </h2>
                         <span title="Выкуплено / заказано × 100%">
                           <Info size={15} />
                         </span>
                       </div>
                       <Gauge
-                        modern={tab === 3}
+                        modern
                         value={buyout}
                         bought={total.bought}
                         orders={total.orders}
                       />
-                      <p className="gauge-caption">
-                        Выкуплено от заказанных товаров
-                      </p>
-                    </Card>
-                    {tab === 0 ? (
-                      <Card className="funnel-card">
-                        <div className="card-heading">
-                          <h2>Воронка за период</h2>
-                          <button
-                            className="icon-button"
-                            aria-label="Подробнее о воронке"
-                            onClick={() => setTab(2)}
-                          >
-                            <ArrowUpRight size={17} />
-                          </button>
+                      {tab === 0 ? (
+                        <div className="overview-statuses">
+                          {[
+                            ["Выкуплено", total.bought, "#ff8d43"],
+                            ["Отменено", total.cancelled, "#343b52"],
+                            ["Возвращено", total.returned, "#c6b6dd"],
+                          ].map(([label, value, color]) => (
+                            <button
+                              key={label}
+                              onClick={() => {
+                                setTab(3);
+                                chooseOutcome(
+                                  label === "Возвращено"
+                                    ? "returned"
+                                    : label === "Отменено"
+                                      ? "cancelled"
+                                      : "all",
+                                );
+                              }}
+                            >
+                              <span>
+                                <i style={{ background: color }} />
+                                {label}
+                              </span>
+                              <strong>{fmt(value)} шт.</strong>
+                            </button>
+                          ))}
                         </div>
-                        <Funnel total={total} />
-                      </Card>
-                    ) : null}
+                      ) : (
+                        <p className="gauge-caption">
+                          Выкуплено от заказанных товаров
+                        </p>
+                      )}
+                    </Card>
                   </div>
                 )}
                 {tab === 0 && (
-                  <div className="bottom-grid">
-                    <ProductTable
-                      products={tableProducts}
-                      metric={metric}
-                      compact
-                      sort={sort}
-                      onSort={onSort}
-                      onProduct={setProductSku}
-                      renderPhoto={renderCatalogPhoto}
-                      onAll={() => {
-                        setTab(1);
-                        setCatalogMode("analytics");
-                      }}
-                    />
-                    <Insights view={view} onQuality={() => setTab(3)} />
-                  </div>
+                  <Overview
+                    report={report}
+                    view={view}
+                    filters={effectiveFilters}
+                    renderPhoto={renderCatalogPhoto}
+                    onProduct={setProductSku}
+                    onGrowth={() => {
+                      setTab(2);
+                      requestAnimationFrame(() =>
+                        document.querySelector(".growth-list")?.scrollIntoView({
+                          behavior: "smooth",
+                          block: "start",
+                        }),
+                      );
+                    }}
+                    onDay={(date) =>
+                      setFilters((f) => ({ ...f, start: date, end: date }))
+                    }
+                    leaders={
+                      <ProductTable
+                        products={tableProducts}
+                        metric={metric}
+                        compact
+                        leaders
+                        sort={sort}
+                        onSort={onSort}
+                        onProduct={setProductSku}
+                        renderPhoto={renderCatalogPhoto}
+                        onAll={() => {
+                          setTab(1);
+                          setCatalogMode("analytics");
+                        }}
+                      />
+                    }
+                  />
                 )}
                 {tab === 1 && (
                   <ProductTable

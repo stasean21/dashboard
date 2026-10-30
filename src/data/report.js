@@ -10,7 +10,87 @@ export const numericColumns = {
   AG: "cancelled",
   AH: "returned",
 };
-export const sumFields = Object.values(numericColumns);
+export const sumFields = [
+  ...Object.values(numericColumns),
+  "searchCart",
+  "cardCart",
+];
+const legacySchema = {
+  ...Object.fromEntries(
+    Object.entries(numericColumns).map(([column, key]) => [key, column]),
+  ),
+  searchCart: "U",
+  cardCart: "Y",
+  stock: "AO",
+  priceIndex: "AK",
+  reviews: "AP",
+  rating: "AQ",
+};
+export const headerText = (value) =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/ё/g, "е")
+    .replace(/\s+/g, " ")
+    .trim();
+const reportHeaders = {
+  "заказано на сумму (по цене реализации)": "amount",
+  "заказано на сумму": "amount",
+  "показы всего": "impressions",
+  "показы в поиске и каталоге": "searchImpressions",
+  "посещения карточки товара": "visits",
+  "добавления в корзину всего": "cart",
+  "заказано товаров": "orders",
+  "доставлено товаров": "delivered",
+  "выкуплено товаров": "bought",
+  "отменено товаров (на дату заказа)": "cancelled",
+  "возвращено товаров (на дату заказа)": "returned",
+  "добавления из поиска и каталога в корзину": "searchCart",
+  "добавления из карточки в корзину": "cardCart",
+  "остаток на конец периода": "stock",
+  "индекс цен": "priceIndex",
+  отзывы: "reviews",
+  "рейтинг товара": "rating",
+  "уникальные посетители, всего": "uniqueVisitors",
+};
+export function reportSchema(headers) {
+  const found = {};
+  for (const [column, label] of Object.entries(headers)) {
+    const field = reportHeaders[headerText(label)];
+    if (field) found[field] = column;
+  }
+  // Complete real exports use their own column mapping. Minimal legacy fixtures
+  // can omit labels, but an expanded export must not silently fall back to offsets.
+  const schema = { ...legacySchema, ...found };
+  if (Object.keys(found).length >= 8) {
+    for (const key of Object.values(numericColumns))
+      if (!found[key])
+        throw new Error(`Не найден обязательный столбец отчёта: ${key}`);
+    for (const key of [
+      "searchCart",
+      "cardCart",
+      "stock",
+      "priceIndex",
+      "reviews",
+      "rating",
+    ])
+      if (!found[key]) delete schema[key];
+  }
+  return { ...schema, recognized: Object.keys(found) };
+}
+export function nullableNumber(value) {
+  if (
+    value == null ||
+    String(value).trim() === "" ||
+    /^[–—-]$/.test(String(value).trim())
+  )
+    return null;
+  const parsed = Number(
+    String(value)
+      .replace(/[\s\u00a0]/g, "")
+      .replace(",", "."),
+  );
+  return Number.isFinite(parsed) ? parsed : null;
+}
 export const number = (value) => {
   if (value == null || /^[–—-]$/.test(String(value).trim())) return 0;
   const n = Number(
@@ -32,7 +112,7 @@ export function normalizeDate(value) {
       .slice(0, 10);
   return "";
 }
-export function normalizeRow(d) {
+export function normalizeRow(d, schema = legacySchema) {
   const row = {
     name: d.A || "",
     category: d.C || "",
@@ -42,11 +122,14 @@ export function normalizeRow(d) {
     article: d.I || "",
     date: normalizeDate(d.J),
     abc: /^[ABC]$/.test(d.K) ? d.K : "—",
-    rating: number(d.AQ),
-    reviews: number(d.AP),
+    rating: nullableNumber(d[schema.rating]),
+    reviews: nullableNumber(d[schema.reviews]),
+    stock: nullableNumber(d[schema.stock]),
+    priceIndex: /^[–—-]$/.test(String(d[schema.priceIndex] || "").trim())
+      ? ""
+      : String(d[schema.priceIndex] || "").trim(),
   };
-  for (const [column, key] of Object.entries(numericColumns))
-    row[key] = number(d[column]);
+  for (const key of sumFields) row[key] = number(d[schema[key]]);
   return row;
 }
 export function finishReport(rows, summary, meta = {}) {
@@ -56,15 +139,11 @@ export function finishReport(rows, summary, meta = {}) {
     );
   rows.sort((a, b) => a.date.localeCompare(b.date));
   const sums = Object.fromEntries(
-    sumFields.map((k) => [k, rows.reduce((s, r) => s + r[k], 0)]),
+    sumFields.map((k) => [k, rows.reduce((s, r) => s + (r[k] || 0), 0)]),
   );
-  const totals = summary
-    ? Object.fromEntries(
-        Object.entries(numericColumns).map(([col, key]) => [
-          key,
-          number(summary[col]),
-        ]),
-      )
+  const summaryRow = summary ? normalizeRow(summary, meta.schema) : null;
+  const totals = summaryRow
+    ? Object.fromEntries(sumFields.map((key) => [key, summaryRow[key]]))
     : sums;
   const discrepancies = sumFields
     .filter((k) => Math.abs(totals[k] - sums[k]) > 0.01)
@@ -75,7 +154,7 @@ export function finishReport(rows, summary, meta = {}) {
       difference: sums[k] - totals[k],
     }));
   return {
-    version: 1,
+    version: 2,
     rows,
     summary: totals,
     discrepancies,
@@ -83,8 +162,12 @@ export function finishReport(rows, summary, meta = {}) {
     fileName: meta.fileName || "",
     minDate: rows[0].date,
     maxDate: rows.at(-1).date,
-    rating: summary ? number(summary.AQ) : null,
-    reviews: summary ? number(summary.AP) : null,
+    rating: summaryRow?.rating ?? null,
+    reviews: summaryRow?.reviews ?? null,
+    capabilities: {
+      stock: meta.schema?.recognized?.includes("stock") || false,
+      priceIndex: meta.schema?.recognized?.includes("priceIndex") || false,
+    },
     summaryAvailable: !!summary,
   };
 }
@@ -120,9 +203,9 @@ export function getView(report, filters) {
       });
     const p = productMap.get(r.sku);
     for (const k of sumFields) {
-      total[k] += r[k];
-      day[k] += r[k];
-      p[k] += r[k];
+      total[k] += r[k] || 0;
+      day[k] += r[k] || 0;
+      p[k] += r[k] || 0;
     }
     if (r.date >= p.latest)
       Object.assign(p, {

@@ -27,18 +27,18 @@ const read = (name) =>
   );
 const ozon = read("report"),
   wb = read("catalog-wb");
-test("real catalogs reconcile 702 offers, 309 exact pairs and 5 actual checks without confirmed links", () => {
+test("real catalogs reconcile 704 offers, 310 exact pairs and 5 actual checks without confirmed links", () => {
   const c = buildCatalog(ozon, wb);
-  assert.deepEqual(c.sourceCounts, { ozon: 311, wb: 391 });
-  assert.equal(c.offers.size, 702);
-  assert.equal(c.candidates, 309);
+  assert.deepEqual(c.sourceCounts, { ozon: 313, wb: 391 });
+  assert.equal(c.offers.size, 704);
+  assert.equal(c.candidates, 310);
   assert.equal(c.checks.filter((i) => i.kind === "duplicate").length, 1);
   assert.equal(c.checks.filter((i) => i.kind === "article").length, 2);
   assert.equal(c.checks.filter((i) => i.kind === "deleted").length, 2);
   assert.equal(c.rows.filter((r) => r.status === "linked").length, 0);
   assert.equal(checksForMarket(c, "ozon").length, 3);
   assert.equal(checksForMarket(c, "all").length, 5);
-  assert.equal(new Set(c.rows.flatMap((r) => r.offerIds)).size, 702);
+  assert.equal(new Set(c.rows.flatMap((r) => r.offerIds)).size, 704);
 });
 test("identity preserves punctuation, leading zeros, variants and account namespace", () => {
   assert.equal(normalizeArticle(" 001/AbC/ "), "001/abc/");

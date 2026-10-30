@@ -205,7 +205,7 @@ test("modal cost, clipboard and manual photo survive reload and WB re-import in 
   await nav(page).getByRole("button", { name: "Обзор", exact: true }).click();
   await expect(page.locator(".marketplace-empty")).toBeVisible();
   await market(page, "Ozon");
-  await expect(page.locator(".metric").first()).toContainText(/8\s*151\s*692/);
+  await expect(page.locator(".metric").first()).toContainText(/8\s*493\s*010/);
 });
 test("catalog row identifiers copy exact values without opening product cards", async ({
   page,

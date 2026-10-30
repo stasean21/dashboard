@@ -12,3 +12,5 @@ createRoot(document.getElementById("root")).render(
 );
 
 import "./components/dashboard-redesign.css";
+
+import "./components/overview.css";

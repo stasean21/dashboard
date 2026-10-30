@@ -181,7 +181,7 @@ test("one calendar drives sales, advertising and export; aggregate totals never 
   );
   await main(page).getByRole("button", { name: "Обзор", exact: true }).click();
   await expect(page.locator(".date-button")).toContainText(/01.07.*28.09.2026/);
-  await expect(page.locator(".period-coverage")).toBeVisible();
+  await expect(page.locator(".period-coverage")).toHaveCount(0);
   await expect(page.locator(".metric").first()).toContainText(/4\s*305\s*440/);
   await main(page)
     .getByRole("button", { name: "Реклама", exact: true })
@@ -208,9 +208,11 @@ test("one calendar drives sales, advertising and export; aggregate totals never 
   );
   await main(page).getByRole("button", { name: "Обзор", exact: true }).click();
   await expect(page.locator(".date-button")).toContainText(/01.07.*01.07.2026/);
-  await expect(page.locator(".metrics-grid,.chart")).toHaveCount(0);
-  await expect(page.locator(".period-coverage")).toContainText(
-    "За выбранный период нет данных продаж",
+  await expect(page.locator(".metric").first()).toContainText("0 ₽");
+  await expect(page.locator(".period-coverage")).toHaveCount(0);
+  await expect(page.locator(".trend-card .chart")).toHaveAttribute(
+    "data-buckets",
+    "1",
   );
   await main(page)
     .getByRole("button", { name: "Реклама", exact: true })

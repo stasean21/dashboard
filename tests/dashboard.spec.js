@@ -14,23 +14,23 @@ test("real report loads, product drilldown and date filters recalculate actual t
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await ready(page);
-  await expect(metric(page, 0)).toHaveText(/8\s*151\s*692/);
-  await expect(page.locator(".gauge>strong")).toHaveText("82,19%");
+  await expect(metric(page, 0)).toHaveText(/8\s*493\s*010/);
+  await expect(page.locator(".gauge>strong")).toHaveText("82,34%");
   await page
     .getByRole("button", { name: /Гарри Поттер Большой Замок Хогвартс/ })
     .click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await expect(page.locator(".detail-metrics")).toContainText(/1\s*557\s*747/);
   await page.getByRole("button", { name: "Закрыть", exact: true }).click();
-  await page.getByRole("button", { name: /30.07.*29.10.2026/ }).click();
+  await page.getByRole("button", { name: /03.11.2025.*29.10.2026/ }).click();
   await page.getByRole("button", { name: "7 дней", exact: true }).click();
   await page.getByRole("button", { name: "Применить период" }).click();
   await expect(metric(page, 0)).toHaveText(/799\s*382/);
   await expect(metric(page, 1)).toHaveText(/243/);
   await page.getByRole("button", { name: "Недели", exact: true }).click();
-  await page.getByRole("button", { name: "Столбцы", exact: true }).click();
+  await page.getByRole("button", { name: "Линия", exact: true }).click();
   await expect(
-    page.getByRole("button", { name: "Линия", exact: true }),
+    page.getByRole("button", { name: "Столбцы", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Воронка", exact: true }).click();
   await page.getByRole("combobox", { name: "Этап воронки" }).click();
@@ -65,7 +65,7 @@ test("search, ABC, sorting, infinite scrolling and CSV work", async ({
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Экспорт CSV" }).click();
   expect((await download).suggestedFilename()).toContain(
-    "formula_2026-07-30_2026-10-29.csv",
+    "formula_2025-11-03_2026-10-29.csv",
   );
   await page.getByLabel("Поиск товаров").fill("такого товара точно нет");
   await expect(
@@ -122,7 +122,7 @@ test("Excel upload runs in worker and replaces report; refresh restores original
   );
   await page.keyboard.press("Escape");
   await page.reload();
-  await expect(metric(page, 0)).toHaveText(/8\s*151\s*692/);
+  await expect(metric(page, 0)).toHaveText(/8\s*493\s*010/);
 });
 test("mobile viewport has no page overflow and date dialog works", async ({
   page,
@@ -134,7 +134,7 @@ test("mobile viewport has no page overflow and date dialog works", async ({
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
-  await page.getByRole("button", { name: /30.07.*29.10.2026/ }).click();
+  await page.getByRole("button", { name: /03.11.2025.*29.10.2026/ }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.locator('[data-calendar-date="2026-10-29"]').click();
   await page.locator('[data-calendar-date="2026-10-29"]').click();
@@ -154,11 +154,11 @@ test("KPI cards synchronize active state, chart, product table, and dates", asyn
   await ready(page);
   await expect(page.locator(".trend-card .chart")).toHaveAttribute(
     "data-group",
-    "week",
+    "month",
   );
   await expect(page.locator(".trend-card .chart")).toHaveAttribute(
     "data-buckets",
-    "14",
+    "12",
   );
   for (const [name, key, title] of [
     ["Заказано товаров", "orders", "Товары по количеству заказанных"],
@@ -180,9 +180,9 @@ test("KPI cards synchronize active state, chart, product table, and dates", asyn
       "data-metric",
       key,
     );
-    await expect(
-      page.getByRole("heading", { name: title, exact: true }),
-    ).toBeVisible();
+    await expect(page.locator(".leaders-card .table-context")).toHaveText(
+      title,
+    );
     await expect(page.locator("thead th").last()).toHaveAttribute(
       "aria-sort",
       "descending",
@@ -194,7 +194,7 @@ test("KPI cards synchronize active state, chart, product table, and dates", asyn
   await expect(
     page.locator("tbody tr").first().locator("td").last(),
   ).toHaveText("177");
-  await page.getByRole("button", { name: /30.07.*29.10.2026/ }).click();
+  await page.getByRole("button", { name: /03.11.2025.*29.10.2026/ }).click();
   await page.getByRole("button", { name: "7 дней", exact: true }).click();
   await page.getByRole("button", { name: "Применить период" }).click();
   await expect(page.locator(".trend-card .chart")).toHaveAttribute(
@@ -205,7 +205,7 @@ test("KPI cards synchronize active state, chart, product table, and dates", asyn
     "data-buckets",
     "7",
   );
-  await expect(page.locator(".chart-summary")).toContainText("224");
+  await expect(page.locator(".chart-summary")).toContainText("222");
   await page.getByRole("button", { name: "Средняя цена", exact: true }).click();
   await expect(page.locator(".trend-card .chart")).toHaveAttribute(
     "data-metric",
@@ -223,7 +223,7 @@ test("quality long-range chart has useful buckets and status-linked tables; dail
   await expect(page.locator(".page-stat-grid")).toContainText("39");
   await expect(page.locator(".trend-card .chart")).toHaveAttribute(
     "data-buckets",
-    "14",
+    "12",
   );
   await expect(
     page
@@ -263,6 +263,7 @@ test("chart lines have rounded cubic bends in daily and weekly modes", async ({
   page,
 }) => {
   await ready(page);
+  await page.getByRole("button", { name: "Линия", exact: true }).click();
   const curve = page.locator(".trend-card .recharts-area-curve");
   for (const mode of ["Дни", "Недели"]) {
     await page.getByRole("button", { name: mode, exact: true }).click();
@@ -283,7 +284,7 @@ test("approved calendar 03 supports reverse ranges, preview, cancel and report b
   page,
 }) => {
   await ready(page);
-  await page.getByRole("button", { name: /30.07.*29.10.2026/ }).click();
+  await page.getByRole("button", { name: /03.11.2025.*29.10.2026/ }).click();
   await expect(page.locator(".range-month")).toHaveCount(2);
   await expect(
     page.locator('[data-calendar-date="2026-10-30"]'),
@@ -300,8 +301,8 @@ test("approved calendar 03 supports reverse ranges, preview, cancel and report b
   await page.locator('[data-calendar-date="2026-10-23"]').click();
   await expect(page.locator(".range-selection")).toContainText("7 дней");
   await page.getByRole("button", { name: "Отмена", exact: true }).click();
-  await expect(metric(page, 0)).toHaveText(/8\s*151\s*692/);
-  await page.getByRole("button", { name: /30.07.*29.10.2026/ }).click();
+  await expect(metric(page, 0)).toHaveText(/8\s*493\s*010/);
+  await page.getByRole("button", { name: /03.11.2025.*29.10.2026/ }).click();
   await page.getByRole("button", { name: "14 дней", exact: true }).click();
   await expect(page.locator(".range-selection")).toContainText("16 октября");
   await expect(page.locator(".range-selection")).toContainText("14 дней");
@@ -354,7 +355,7 @@ test("calendar day keyboard navigation and mobile dialog stay within the viewpor
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await ready(page);
-  await page.getByRole("button", { name: /30.07.*29.10.2026/ }).click();
+  await page.getByRole("button", { name: /03.11.2025.*29.10.2026/ }).click();
   const day = page.locator('[data-calendar-date="2026-10-22"]');
   await day.focus();
   await page.keyboard.press("ArrowRight");

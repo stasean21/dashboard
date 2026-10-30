@@ -48,7 +48,9 @@ test("marketplace control is beside the profile and general mode preserves actua
   await expect(page.locator(".ad-period-unavailable")).toContainText(
     "В файле нет разбивки по дням",
   );
-  await expect(page.locator(".date-button")).toContainText(/30.07.*29.10.2026/);
+  await expect(page.locator(".date-button")).toContainText(
+    /03.11.2025.*29.10.2026/,
+  );
   await select(page, "Ozon");
   await expect(page.locator(".marketplace-coverage")).toHaveCount(0);
   await main(page).getByRole("button", { name: "Обзор", exact: true }).click();
@@ -113,7 +115,7 @@ test("unconnected marketplaces hide Ozon sales and advertising in every section"
   await page
     .getByRole("button", { name: "Перейти в Ozon", exact: true })
     .click();
-  await expect(page.locator(".metric").first()).toContainText(/8\s*151\s*692/);
+  await expect(page.locator(".metric").first()).toContainText(/8\s*493\s*010/);
   expect(errors).toEqual([]);
 });
 
@@ -167,5 +169,5 @@ test("blocked browser storage does not prevent switching", async ({ page }) => {
   await select(page, "Wildberries");
   await expect(page.locator(".marketplace-empty")).toContainText("Wildberries");
   await select(page, "Ozon");
-  await expect(page.locator(".metric").first()).toContainText(/8\s*151\s*692/);
+  await expect(page.locator(".metric").first()).toContainText(/8\s*493\s*010/);
 });

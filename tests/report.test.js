@@ -25,25 +25,25 @@ const all = {
   abc: "all",
   scheme: "all",
 };
-test("initial dataset: 18,047 daily rows and 311 distinct SKU", () => {
-  assert.equal(report.rows.length, 18047);
-  assert.equal(new Set(report.rows.map((r) => r.sku)).size, 311);
-  assert.equal(report.minDate, "2026-07-30");
+test("initial dataset: detailed annual report with 18,868 daily rows and 313 distinct SKU", () => {
+  assert.equal(report.rows.length, 18868);
+  assert.equal(new Set(report.rows.map((r) => r.sku)).size, 313);
+  assert.equal(report.minDate, "2025-11-03");
   assert.equal(report.maxDate, "2026-10-29");
 });
 test("unfiltered KPIs preserve source summary rather than contradictory details", () => {
   const v = getView(report, all);
-  assert.equal(v.total.amount, 8151692);
-  assert.equal(v.total.orders, 2605);
-  assert.equal(v.total.bought, 2141);
+  assert.equal(v.total.amount, 8493010);
+  assert.equal(v.total.orders, 2740);
+  assert.equal(v.total.bought, 2256);
   assert.equal(v.useSummary, true);
   assert.deepEqual(
     report.discrepancies.map((d) => d.difference),
-    [46, 28],
+    [47, 28],
   );
   assert.equal(
     v.days.reduce((s, d) => s + d.amount, 0),
-    8151738,
+    8493057,
   );
 });
 test("date filter is inclusive and recalculates detail totals", () => {
@@ -89,11 +89,11 @@ test("grouping preserves totals and partial calendar months", () => {
   const months = groupDays(days, "month");
   assert.deepEqual(
     months.map((d) => d.amount),
-    [0, 825739, 3720987, 3605012],
+    [116779, 224540, 0, 0, 0, 0, 0, 0, 0, 825739, 3720987, 3605012],
   );
   assert.equal(
     groupDays(days, "week").reduce((s, d) => s + d.orders, 0),
-    2605,
+    2740,
   );
 });
 test("date helpers are timezone-independent and percentages handle zero", () => {
@@ -178,13 +178,13 @@ test("automatic scale and bucket counts keep long periods readable", async () =>
     buckets = chartBuckets(v.days, "week");
   assert.equal(
     buckets.reduce((s, d) => s + d.cancelled, 0),
-    450,
+    469,
   );
   assert.equal(
     buckets.reduce((s, d) => s + d.returned, 0),
-    14,
+    15,
   );
-  assert.equal(buckets.length, 14);
+  assert.equal(buckets.length, 52);
 });
 
 test("calendar grids use Monday weeks and handle leap years and year boundaries", async () => {
@@ -317,7 +317,7 @@ test("advertising parser rejects mismatched reporting periods", () => {
 test("shared calendar includes sales and advertising source periods", async () => {
   const { calendarBounds } = await import("../src/data/calendar.js");
   assert.deepEqual(calendarBounds(report, adsReport), {
-    minDate: "2026-07-01",
+    minDate: "2025-11-03",
     maxDate: "2026-10-29",
   });
   assert.deepEqual(calendarBounds(report, null), {
@@ -357,10 +357,10 @@ test("aggregate advertising cannot be sliced, prorated, or presented as zeros fo
 test("sales days outside source coverage are unknown rather than zero", () => {
   const view = getView(report, {
     ...all,
-    start: "2026-07-01",
+    start: "2025-11-01",
     end: report.maxDate,
   });
-  assert.equal(view.total.amount, 8151692);
+  assert.equal(view.total.amount, 8493010);
   assert.equal(view.days[0].amount, null);
   assert.equal(view.days[0].unavailable, true);
   assert.equal(view.days[0].missing, true);
