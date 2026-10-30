@@ -186,3 +186,25 @@ test("automatic scale and bucket counts keep long periods readable", async () =>
   );
   assert.equal(buckets.length, 14);
 });
+
+test("calendar grids use Monday weeks and handle leap years and year boundaries", async () => {
+  const { monthGrid, shiftMonth, dayCountLabel, rangeLength } =
+    await import("../src/data/calendar.js");
+  const sep = monthGrid("2026-09-01");
+  assert.equal(sep[0].date, "2026-08-31");
+  assert.equal(sep[1].date, "2026-09-01");
+  assert.equal(sep.filter((d) => d.inMonth).length, 30);
+  assert.equal(monthGrid("2024-02-01").filter((d) => d.inMonth).length, 29);
+  assert.equal(shiftMonth("2026-12-29", 1), "2027-01-01");
+  assert.equal(shiftMonth("2026-01-15", -1), "2025-12-01");
+  assert.equal(rangeLength("2026-10-23", "2026-10-29"), 7);
+  assert.equal(dayCountLabel(1), "1 день");
+  assert.equal(dayCountLabel(2), "2 дня");
+  assert.equal(dayCountLabel(14), "14 дней");
+  assert.equal(dayCountLabel(21), "21 день");
+});
+test("today and yesterday follow Moscow midnight instead of browser timezone", async () => {
+  const { moscowToday, dayBefore } = await import("../src/data/calendar.js");
+  assert.equal(moscowToday(new Date("2026-10-29T22:00:00Z")), "2026-10-30");
+  assert.equal(dayBefore("2026-03-01"), "2026-02-28");
+});

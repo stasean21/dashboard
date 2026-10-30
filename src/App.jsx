@@ -29,7 +29,6 @@ import {
   ShoppingCart,
   ArrowUpDown,
   Info,
-  Check,
   RotateCcw,
   FileSpreadsheet,
   AlertCircle,
@@ -38,7 +37,6 @@ import {
 import { gunzipSync, strFromU8 } from "fflate";
 import {
   getView,
-  rangePreset,
   previousRange,
   ratio,
   fmt,
@@ -56,6 +54,9 @@ import {
   recommendedGroup,
   chartBuckets,
 } from "./data/metrics.js";
+
+import Select from "./components/Select.jsx";
+import DateRangePicker from "./components/DateRangePicker.jsx";
 
 const tabs = ["Обзор", "Товары", "Воронка", "Качество"];
 const titles = [
@@ -504,6 +505,7 @@ function ProductTable({
   onSort,
   metric = "amount",
   quality = false,
+  onMetricChange,
 }) {
   const [page, setPage] = useState(0);
   useEffect(() => setPage(0), [products, sort]);
@@ -553,6 +555,16 @@ function ProductTable({
           </p>
         </div>
         <div className="inline">
+          {onMetricChange && (
+            <Select
+              label="Показатель таблицы"
+              value={metric}
+              onChange={onMetricChange}
+              options={["amount", "orders", "bought", "averagePrice"].map(
+                (key) => ({ value: key, label: metrics[key].label }),
+              )}
+            />
+          )}
           <span className="chip">{fmt(products.length)} SKU</span>
           {compact && (
             <button className="text-button" onClick={onAll}>
@@ -702,8 +714,7 @@ function App() {
     [loadError, setLoadError] = useState("");
   const [filters, setFilters] = useState({ start: "", end: "", ...defaults });
   const [tab, setTab] = useState(0),
-    [periodOpen, setPeriodOpen] = useState(false),
-    [draftDates, setDraftDates] = useState({ start: "", end: "" });
+    [periodOpen, setPeriodOpen] = useState(false);
   const [funnelMetric, setFunnelMetric] = useState("impressions");
   const [metric, setMetric] = useState("amount"),
     [group, setGroup] = useState("auto"),
@@ -1020,7 +1031,6 @@ function App() {
             <button
               className="button date-button"
               onClick={() => {
-                setDraftDates({ start: filters.start, end: filters.end });
                 setPeriodOpen(true);
               }}
             >
@@ -1080,29 +1090,31 @@ function App() {
             <SlidersHorizontal size={15} />
             <label>
               <span className="sr-only">Класс ABC</span>
-              <select
-                aria-label="Класс ABC"
+              <Select
+                label="Класс ABC"
                 value={filters.abc}
-                onChange={(e) => update("abc", e.target.value)}
-              >
-                <option value="all">Все классы ABC</option>
-                <option value="A">Класс A</option>
-                <option value="B">Класс B</option>
-                <option value="C">Класс C</option>
-                <option value="—">Без класса</option>
-              </select>
+                onChange={(value) => update("abc", value)}
+                options={[
+                  { value: "all", label: "Все классы ABC" },
+                  { value: "A", label: "Класс A" },
+                  { value: "B", label: "Класс B" },
+                  { value: "C", label: "Класс C" },
+                  { value: "—", label: "Без класса" },
+                ]}
+              />
             </label>
             <label>
               <span className="sr-only">Схема работы</span>
-              <select
-                aria-label="Схема работы"
+              <Select
+                label="Схема работы"
                 value={filters.scheme}
-                onChange={(e) => update("scheme", e.target.value)}
-              >
-                <option value="all">FBO + FBS</option>
-                <option value="FBO">Есть FBO</option>
-                <option value="FBS">Есть FBS</option>
-              </select>
+                onChange={(value) => update("scheme", value)}
+                options={[
+                  { value: "all", label: "FBO + FBS" },
+                  { value: "FBO", label: "Есть FBO" },
+                  { value: "FBS", label: "Есть FBS" },
+                ]}
+              />
             </label>
             {activeFilters && (
               <button className="text-button" onClick={reset}>
@@ -1120,47 +1132,49 @@ function App() {
             Экспорт CSV
           </button>
         </div>
-        <div className="metrics-grid">
-          <Metric
-            title="Заказано на сумму"
-            value={money(total.amount)}
-            active={metric === "amount"}
-            onClick={() => chooseMetric("amount")}
-          >
-            Включая отмены и возвраты
-          </Metric>
-          <Metric
-            title="Заказано товаров"
-            active={metric === "orders"}
-            onClick={() => chooseMetric("orders")}
-            value={fmt(total.orders)}
-            suffix="шт."
-          >
-            {fmt(view.products.length)} SKU в выбранных данных
-          </Metric>
-          <Metric
-            title="Выкуплено товаров"
-            active={metric === "bought"}
-            onClick={() => chooseMetric("bought")}
-            value={fmt(total.bought)}
-            suffix="шт."
-          >
-            <span className="green-dot" />
-            {percent(buyout)} от заказанных
-          </Metric>
-          <Metric
-            title="Средняя цена"
-            active={metric === "averagePrice"}
-            onClick={() => chooseMetric("averagePrice")}
-            value={
-              total.orders
-                ? money(Math.round(total.amount / total.orders))
-                : "—"
-            }
-          >
-            Сумма заказов / количество товаров
-          </Metric>
-        </div>
+        {tab === 0 && (
+          <div className="metrics-grid">
+            <Metric
+              title="Заказано на сумму"
+              value={money(total.amount)}
+              active={metric === "amount"}
+              onClick={() => chooseMetric("amount")}
+            >
+              Включая отмены и возвраты
+            </Metric>
+            <Metric
+              title="Заказано товаров"
+              active={metric === "orders"}
+              onClick={() => chooseMetric("orders")}
+              value={fmt(total.orders)}
+              suffix="шт."
+            >
+              {fmt(view.products.length)} SKU в выбранных данных
+            </Metric>
+            <Metric
+              title="Выкуплено товаров"
+              active={metric === "bought"}
+              onClick={() => chooseMetric("bought")}
+              value={fmt(total.bought)}
+              suffix="шт."
+            >
+              <span className="green-dot" />
+              {percent(buyout)} от заказанных
+            </Metric>
+            <Metric
+              title="Средняя цена"
+              active={metric === "averagePrice"}
+              onClick={() => chooseMetric("averagePrice")}
+              value={
+                total.orders
+                  ? money(Math.round(total.amount / total.orders))
+                  : "—"
+              }
+            >
+              Сумма заказов / количество товаров
+            </Metric>
+          </div>
+        )}
         {view.empty ? (
           <Card>
             <Empty reset={reset} />
@@ -1168,7 +1182,9 @@ function App() {
         ) : (
           <>
             {(tab === 0 || tab === 3) && (
-              <div className="overview-grid">
+              <div
+                className={`overview-grid ${tab === 3 ? "quality-grid" : ""}`}
+              >
                 <Card className="trend-card">
                   <div className="card-heading">
                     <div>
@@ -1220,16 +1236,17 @@ function App() {
                       </button>
                     </div>
                     {tab === 0 && (
-                      <select
-                        aria-label="Показатель графика"
+                      <Select
+                        label="Показатель графика"
                         value={metric}
-                        onChange={(e) => chooseMetric(e.target.value)}
-                      >
-                        <option value="amount">Сумма заказов, ₽</option>
-                        <option value="orders">Заказано, шт.</option>
-                        <option value="bought">Выкуплено, шт.</option>
-                        <option value="averagePrice">Средняя цена, ₽</option>
-                      </select>
+                        onChange={chooseMetric}
+                        options={[
+                          { value: "amount", label: "Сумма заказов, ₽" },
+                          { value: "orders", label: "Заказано, шт." },
+                          { value: "bought", label: "Выкуплено, шт." },
+                          { value: "averagePrice", label: "Средняя цена, ₽" },
+                        ]}
+                      />
                     )}
                   </div>
                   {tab === 0 && (
@@ -1403,6 +1420,7 @@ function App() {
               <ProductTable
                 products={tableProducts}
                 metric={metric}
+                onMetricChange={chooseMetric}
                 sort={sort}
                 onSort={onSort}
                 onProduct={setProductSku}
@@ -1429,17 +1447,18 @@ function App() {
                 <Card className="funnel-dynamics">
                   <div className="card-heading">
                     <h2>Динамика воронки</h2>
-                    <select
-                      aria-label="Этап воронки"
+                    <Select
+                      label="Этап воронки"
                       value={funnelMetric}
-                      onChange={(e) => setFunnelMetric(e.target.value)}
-                    >
-                      <option value="impressions">Показы</option>
-                      <option value="visits">Посещения</option>
-                      <option value="cart">Корзина</option>
-                      <option value="orders">Заказы</option>
-                      <option value="amount">Сумма заказов</option>
-                    </select>
+                      onChange={setFunnelMetric}
+                      options={[
+                        { value: "impressions", label: "Показы" },
+                        { value: "visits", label: "Посещения" },
+                        { value: "cart", label: "Корзина" },
+                        { value: "orders", label: "Заказы" },
+                        { value: "amount", label: "Сумма заказов" },
+                      ]}
+                    />
                   </div>
                   <Chart days={view.days} metric={funnelMetric} height={345} />
                 </Card>
@@ -1476,75 +1495,15 @@ function App() {
         </footer>
       </main>
       {periodOpen && (
-        <Dialog title="Выберите период" onClose={() => setPeriodOpen(false)}>
-          <p className="dialog-description">
-            Данные доступны с {dateLabel(report.minDate)} по{" "}
-            {dateLabel(report.maxDate, {
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            })}
-            .
-          </p>
-          <div className="preset-grid">
-            {[
-              ["7", "7 дней"],
-              ["30", "30 дней"],
-              ["month", "Последний месяц"],
-              ["all", "Весь период"],
-            ].map(([key, label]) => (
-              <button
-                className="button"
-                key={key}
-                onClick={() => setDraftDates(rangePreset(report, key))}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="date-inputs">
-            <label>
-              Начало
-              <input
-                type="date"
-                min={report.minDate}
-                max={report.maxDate}
-                value={draftDates.start}
-                onChange={(e) =>
-                  setDraftDates((d) => ({ ...d, start: e.target.value }))
-                }
-              />
-            </label>
-            <label>
-              Конец
-              <input
-                type="date"
-                min={report.minDate}
-                max={report.maxDate}
-                value={draftDates.end}
-                onChange={(e) =>
-                  setDraftDates((d) => ({ ...d, end: e.target.value }))
-                }
-              />
-            </label>
-          </div>
-          <button
-            className="button primary full-width"
-            disabled={
-              !draftDates.start ||
-              !draftDates.end ||
-              draftDates.start > draftDates.end ||
-              draftDates.start < report.minDate ||
-              draftDates.end > report.maxDate
-            }
-            onClick={() => {
-              setFilters((f) => ({ ...f, ...draftDates }));
-              setPeriodOpen(false);
-            }}
-          >
-            Применить период <Check size={16} />
-          </button>
-        </Dialog>
+        <DateRangePicker
+          report={report}
+          value={{ start: filters.start, end: filters.end }}
+          onClose={() => setPeriodOpen(false)}
+          onApply={(range) => {
+            setFilters((f) => ({ ...f, ...range }));
+            setPeriodOpen(false);
+          }}
+        />
       )}
       {selectedProduct && (
         <Dialog
