@@ -114,6 +114,7 @@ test("modal cost, clipboard and manual photo survive reload and WB re-import in 
   const box = await page.locator(".product-photo-large").boundingBox();
   expect(box.width / box.height).toBeCloseTo(3 / 4, 2);
   await page
+    .getByRole("dialog")
     .getByRole("button", {
       name: "Скопировать SKU Ozon: 3063202481",
       exact: true,
@@ -206,6 +207,50 @@ test("modal cost, clipboard and manual photo survive reload and WB re-import in 
   await market(page, "Ozon");
   await expect(page.locator(".metric").first()).toContainText(/8\s*151\s*692/);
 });
+test("catalog row identifiers copy exact values without opening product cards", async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await ready(page);
+  await market(page, "Общий");
+  const search = page.getByLabel("Поиск в каталоге", { exact: true });
+  await search.fill("100019/6998");
+  for (const [label, value] of [
+    ["артикул продавца", "100019/6998/"],
+    ["SKU Ozon", "5766192752"],
+    ["артикул WB", "587575764"],
+  ]) {
+    const button = page.getByRole("button", {
+      name: `Скопировать ${label}: ${value}`,
+      exact: true,
+    });
+    await button.click();
+    await expect(button.getByRole("status")).toHaveText("Скопировано");
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+      value,
+    );
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+  }
+  await search.fill("368909043");
+  for (const [label, value] of [
+    ["артикул продавца", "0001"],
+    ["артикул WB", "368909043"],
+  ]) {
+    await page
+      .getByRole("button", {
+        name: `Скопировать ${label}: ${value}`,
+        exact: true,
+      })
+      .click();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+      value,
+    );
+  }
+  expect(await page.locator("button button").count()).toBe(0);
+  await page.locator(".catalog-row-product").click();
+  await expect(page.locator(".catalog-product-dialog")).toBeVisible();
+});
 test("photos, large identifiers and check popover fit phone and tablet; backdrop closes only outside", async ({
   page,
 }) => {
@@ -236,6 +281,7 @@ test("photos, large identifiers and check popover fit phone and tablet; backdrop
     expect(
       parseFloat(
         await page
+          .getByRole("dialog")
           .getByRole("button", {
             name: "Скопировать SKU Ozon: 3063202481",
             exact: true,

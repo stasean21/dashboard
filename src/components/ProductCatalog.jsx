@@ -10,7 +10,28 @@ import {
 } from "lucide-react";
 import { rowsForMarket } from "../data/catalog.js";
 import ProductPhoto from "./ProductPhoto.jsx";
+import CopyValue from "./CopyValue.jsx";
 import { CheckBadge, CheckMark, checkCount } from "./CatalogChecks.jsx";
+
+function CatalogRowIdentity({ name, articles, icon, onOpen, children }) {
+  return (
+    <div className="catalog-product-cell">
+      {icon}
+      <div className="catalog-product-meta">
+        <button type="button" className="catalog-row-product" onClick={onOpen}>
+          <strong>{name}</strong>
+        </button>
+        <div className="catalog-row-articles">
+          <span>Артикул{articles.length > 1 ? "ы" : ""}:</span>
+          {articles.filter(Boolean).map((article) => (
+            <CopyValue key={article} value={article} label="артикул продавца" />
+          ))}
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
 
 export function CatalogTabs({ mode, onChange, count, analytics }) {
   return (
@@ -180,7 +201,17 @@ export default function ProductCatalog({
           </div>
         ) : (
           <div className="table-scroll">
-            <table className="catalog-table">
+            <table
+              className={`catalog-table ${mode === "checks" ? "catalog-check-table" : ""}`}
+            >
+              <colgroup>
+                {(mode === "checks"
+                  ? [41, 26, 23, 10]
+                  : [41, 14, 14, 21, 10]
+                ).map((width, i) => (
+                  <col key={i} style={{ width: `${width}%` }} />
+                ))}
+              </colgroup>
               <thead>
                 <tr>
                   {(mode === "checks"
@@ -202,16 +233,18 @@ export default function ProductCatalog({
                   mode === "checks" ? (
                     <tr key={row.id}>
                       <td>
-                        <button
-                          className="catalog-row-product"
-                          onClick={() => onCheck(row.id)}
-                        >
-                          <CheckMark check={row} />
-                          <span>
-                            <strong>{row.name}</strong>
-                            <small>{row.article}</small>
-                          </span>
-                        </button>
+                        <CatalogRowIdentity
+                          name={row.name}
+                          articles={[
+                            ...new Set(
+                              row.offerIds.map(
+                                (id) => catalog.offers.get(id).article,
+                              ),
+                            ),
+                          ]}
+                          icon={<CheckMark check={row} />}
+                          onOpen={() => onCheck(row.id)}
+                        />
                       </td>
                       <td>
                         <p className="catalog-check-title">{row.title}</p>
@@ -222,8 +255,17 @@ export default function ProductCatalog({
                             const o = catalog.offers.get(id);
                             return (
                               <span key={id}>
-                                {o.marketplace === "ozon" ? "Ozon" : "WB"}{" "}
-                                {o.sku}
+                                <span className="catalog-sku-market">
+                                  {o.marketplace === "ozon" ? "Ozon" : "WB"}
+                                </span>
+                                <CopyValue
+                                  value={o.sku}
+                                  label={
+                                    o.marketplace === "ozon"
+                                      ? "SKU Ozon"
+                                      : "артикул WB"
+                                  }
+                                />
                               </span>
                             );
                           })}
@@ -247,35 +289,32 @@ export default function ProductCatalog({
                       return (
                         <tr key={row.id}>
                           <td>
-                            <button
-                              className="catalog-row-product"
-                              onClick={() => onOpen(row.id)}
+                            <CatalogRowIdentity
+                              name={row.name}
+                              articles={row.articles}
+                              onOpen={() => onOpen(row.id)}
+                              icon={
+                                <ProductPhoto
+                                  row={row}
+                                  settings={state.cards[row.id]}
+                                  revision={photoRevision}
+                                  decorative
+                                />
+                              }
                             >
-                              <ProductPhoto
-                                row={row}
-                                settings={state.cards[row.id]}
-                                revision={photoRevision}
-                                decorative
-                              />
-                              <span>
-                                <strong>{row.name}</strong>
-                                <small>
-                                  Артикул: {row.articles.join(" · ")}
-                                </small>
-                                {pending.length > 0 && (
-                                  <em className="catalog-mobile-status">
-                                    {pending[0].kind === "duplicate"
-                                      ? "Повтор артикула"
-                                      : pending[0].kind === "article"
-                                        ? "Артикулы отличаются"
-                                        : "Удалена в WB"}
-                                    {pending.length > 1
-                                      ? ` · ещё ${pending.length - 1}`
-                                      : ""}
-                                  </em>
-                                )}
-                              </span>
-                            </button>
+                              {pending.length > 0 && (
+                                <em className="catalog-mobile-status">
+                                  {pending[0].kind === "duplicate"
+                                    ? "Повтор артикула"
+                                    : pending[0].kind === "article"
+                                      ? "Артикулы отличаются"
+                                      : "Удалена в WB"}
+                                  {pending.length > 1
+                                    ? ` · ещё ${pending.length - 1}`
+                                    : ""}
+                                </em>
+                              )}
+                            </CatalogRowIdentity>
                           </td>
                           {["ozon", "wb"].map((market) => (
                             <td key={market}>
@@ -287,7 +326,14 @@ export default function ProductCatalog({
                                       key={o.id}
                                       className={o.deleted ? "deleted" : ""}
                                     >
-                                      {o.sku}
+                                      <CopyValue
+                                        value={o.sku}
+                                        label={
+                                          market === "ozon"
+                                            ? "SKU Ozon"
+                                            : "артикул WB"
+                                        }
+                                      />
                                     </span>
                                   ))}
                                 {!row.offers.some(
