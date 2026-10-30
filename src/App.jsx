@@ -56,14 +56,17 @@ import {
 } from "./data/metrics.js";
 
 import Select from "./components/Select.jsx";
+import Dialog from "./components/Dialog.jsx";
+import Advertising, { AdvertisingMethod } from "./components/Advertising.jsx";
 import DateRangePicker from "./components/DateRangePicker.jsx";
 
-const tabs = ["Обзор", "Товары", "Воронка", "Качество"];
+const tabs = ["Обзор", "Товары", "Воронка", "Качество", "Реклама"];
 const titles = [
   "Обзор продаж",
   "Ваши товары",
   "Воронка продаж",
   "Качество заказов",
+  "Реклама",
 ];
 const labels = {
   averagePrice: "Средняя цена",
@@ -683,35 +686,13 @@ function ProductTable({
     </Card>
   );
 }
-function Dialog({ children, title, onClose, wide = false }) {
-  const ref = useRef();
-  useEffect(() => {
-    const el = ref.current;
-    el.showModal();
-    return () => el.close();
-  }, []);
-  return (
-    <dialog
-      ref={ref}
-      className={`dialog ${wide ? "wide" : ""}`}
-      onCancel={onClose}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="dialog-top">
-        <h2>{title}</h2>
-        <button className="icon-button" aria-label="Закрыть" onClick={onClose}>
-          <X size={19} />
-        </button>
-      </div>
-      {children}
-    </dialog>
-  );
-}
 function App() {
   const [report, setReport] = useState(null),
     [loadError, setLoadError] = useState("");
+  const [adsReport, setAdsReport] = useState(null),
+    [adsLoading, setAdsLoading] = useState(true),
+    [adsError, setAdsError] = useState("");
+  const adsImportedRef = useRef(false);
   const [filters, setFilters] = useState({ start: "", end: "", ...defaults });
   const [tab, setTab] = useState(0),
     [periodOpen, setPeriodOpen] = useState(false);
@@ -770,6 +751,40 @@ function App() {
     return () => {
       active = false;
       workerRef.current?.terminate();
+    };
+  }, []);
+  useEffect(() => {
+    let active = true;
+    fetch("/data/advertising.json.gz")
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        return r.arrayBuffer();
+      })
+      .then((b) => {
+        const bytes = new Uint8Array(b);
+        return JSON.parse(
+          strFromU8(
+            bytes[0] === 0x1f && bytes[1] === 0x8b ? gunzipSync(bytes) : bytes,
+          ),
+        );
+      })
+      .then((r) => {
+        if (active && !adsImportedRef.current) {
+          setAdsReport(r);
+          setAdsError("");
+        }
+      })
+      .catch(() => {
+        if (active && !adsImportedRef.current)
+          setAdsError(
+            "Не удалось загрузить рекламный отчёт. Загрузите аналитику продвижения Excel.",
+          );
+      })
+      .finally(() => {
+        if (active) setAdsLoading(false);
+      });
+    return () => {
+      active = false;
     };
   }, []);
   useEffect(() => {
@@ -842,7 +857,7 @@ function App() {
     if (!file) return;
     if (!/\.xlsx$/i.test(file.name)) {
       setToast(
-        "Поддерживается Excel .xlsx — ежедневный отчёт Ozon «По товарам».",
+        "Поддерживается Excel .xlsx — отчёт Ozon по товарам или аналитика продвижения.",
       );
       return;
     }
@@ -863,7 +878,16 @@ function App() {
       worker.onmessage = ({ data }) => {
         if (data.progress != null) setProgress(data.progress);
         if (data.report) {
-          applyReport(data.report);
+          if (data.report.kind === "advertising") {
+            adsImportedRef.current = true;
+            setAdsReport(data.report);
+            setAdsLoading(false);
+            setAdsError("");
+            setTab(4);
+          } else {
+            applyReport(data.report);
+            setTab(0);
+          }
           setImporting(false);
           setToast(
             `Загружено ${fmt(data.report.rows.length)} строк. Файл обработан локально; после обновления страницы вернётся исходная выгрузка.`,
@@ -1024,29 +1048,45 @@ function App() {
                   ? "Найдите точки роста в каждом SKU"
                   : tab === 2
                     ? "От первого показа до заказа"
-                    : "Выкуп, отмены и возвраты под контролем"}
+                    : tab === 4
+                      ? "Расходы, результат и точки внимания"
+                      : "Выкуп, отмены и возвраты под контролем"}
             </p>
           </div>
           <div className="page-actions">
-            <button
-              className="button date-button"
-              onClick={() => {
-                setPeriodOpen(true);
-              }}
-            >
-              <CalendarDays size={17} />
-              {dateLabel(filters.start, {
-                day: "2-digit",
-                month: "2-digit",
-              })}{" "}
-              —{" "}
-              {dateLabel(filters.end, {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-              })}
-              <ChevronDown size={14} />
-            </button>
+            {tab === 4 ? (
+              <span
+                className="button ad-report-period"
+                title="В файле итоги за весь период; разбивки по дням нет"
+              >
+                <CalendarDays size={17} />
+                {adsReport
+                  ? `${dateLabel(adsReport.start, { day: "2-digit", month: "2-digit" })} — ${dateLabel(adsReport.end, { day: "2-digit", month: "2-digit", year: "numeric" })}`
+                  : "Рекламный отчёт"}
+              </span>
+            ) : (
+              <>
+                <button
+                  className="button date-button"
+                  onClick={() => {
+                    setPeriodOpen(true);
+                  }}
+                >
+                  <CalendarDays size={17} />
+                  {dateLabel(filters.start, {
+                    day: "2-digit",
+                    month: "2-digit",
+                  })}{" "}
+                  —{" "}
+                  {dateLabel(filters.end, {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                  })}
+                  <ChevronDown size={14} />
+                </button>
+              </>
+            )}
             <button
               className="button upload-button"
               disabled={importing}
@@ -1067,432 +1107,456 @@ function App() {
             e.target.value = "";
           }}
         />
-        <div className="filter-bar">
-          <div className="search-field">
-            <Search size={17} />
-            <input
-              aria-label="Поиск товаров"
-              placeholder="Название, артикул или SKU"
-              value={filters.query}
-              onChange={(e) => update("query", e.target.value)}
-            />
-            {filters.query && (
-              <button
-                className="bare-button"
-                aria-label="Очистить поиск"
-                onClick={() => update("query", "")}
-              >
-                <X size={15} />
-              </button>
-            )}
-          </div>
-          <div className="filters">
-            <SlidersHorizontal size={15} />
-            <label>
-              <span className="sr-only">Класс ABC</span>
-              <Select
-                label="Класс ABC"
-                value={filters.abc}
-                onChange={(value) => update("abc", value)}
-                options={[
-                  { value: "all", label: "Все классы ABC" },
-                  { value: "A", label: "Класс A" },
-                  { value: "B", label: "Класс B" },
-                  { value: "C", label: "Класс C" },
-                  { value: "—", label: "Без класса" },
-                ]}
-              />
-            </label>
-            <label>
-              <span className="sr-only">Схема работы</span>
-              <Select
-                label="Схема работы"
-                value={filters.scheme}
-                onChange={(value) => update("scheme", value)}
-                options={[
-                  { value: "all", label: "FBO + FBS" },
-                  { value: "FBO", label: "Есть FBO" },
-                  { value: "FBS", label: "Есть FBS" },
-                ]}
-              />
-            </label>
-            {activeFilters && (
-              <button className="text-button" onClick={reset}>
-                <RotateCcw size={13} />
-                Сбросить
-              </button>
-            )}
-          </div>
-          <button
-            className="text-button export-button"
-            onClick={exportCsv}
-            disabled={view.empty}
-          >
-            <Download size={15} />
-            Экспорт CSV
-          </button>
-        </div>
-        {tab === 0 && (
-          <div className="metrics-grid">
-            <Metric
-              title="Заказано на сумму"
-              value={money(total.amount)}
-              active={metric === "amount"}
-              onClick={() => chooseMetric("amount")}
-            >
-              Включая отмены и возвраты
-            </Metric>
-            <Metric
-              title="Заказано товаров"
-              active={metric === "orders"}
-              onClick={() => chooseMetric("orders")}
-              value={fmt(total.orders)}
-              suffix="шт."
-            >
-              {fmt(view.products.length)} SKU в выбранных данных
-            </Metric>
-            <Metric
-              title="Выкуплено товаров"
-              active={metric === "bought"}
-              onClick={() => chooseMetric("bought")}
-              value={fmt(total.bought)}
-              suffix="шт."
-            >
-              <span className="green-dot" />
-              {percent(buyout)} от заказанных
-            </Metric>
-            <Metric
-              title="Средняя цена"
-              active={metric === "averagePrice"}
-              onClick={() => chooseMetric("averagePrice")}
-              value={
-                total.orders
-                  ? money(Math.round(total.amount / total.orders))
-                  : "—"
-              }
-            >
-              Сумма заказов / количество товаров
-            </Metric>
-          </div>
-        )}
-        {view.empty ? (
-          <Card>
-            <Empty reset={reset} />
-          </Card>
+        {tab === 4 ? (
+          <Advertising
+            report={adsReport}
+            loading={adsLoading}
+            error={adsError}
+            onInfo={() => setInfo(true)}
+            onUpload={() => inputRef.current.click()}
+          />
         ) : (
           <>
-            {(tab === 0 || tab === 3) && (
-              <div
-                className={`overview-grid ${tab === 3 ? "quality-grid" : ""}`}
-              >
-                <Card className="trend-card">
-                  <div className="card-heading">
-                    <div>
-                      <h2>
-                        {tab === 3
-                          ? "Отмены и возвраты"
-                          : metrics[metric].title}
-                      </h2>
-                      <p>
-                        {dateLabel(chartFilters.start)} —{" "}
-                        {dateLabel(chartFilters.end, {
-                          day: "numeric",
-                          month: "long",
-                          year: "numeric",
-                        })}
-                      </p>
-                    </div>
-                    <span className="chip">
-                      {view.days.length} дн. ·{" "}
-                      {group === "auto" ? "автомасштаб" : "выбранный период"}
-                    </span>
-                  </div>
-                  <div className="chart-controls">
-                    <div className="segmented">
-                      <button
-                        aria-pressed={group === "auto"}
-                        className={group === "auto" ? "selected" : ""}
-                        onClick={() => setGroup("auto")}
-                      >
-                        Авто
-                      </button>
-                      <button
-                        className={group === "day" ? "selected" : ""}
-                        onClick={() => setGroup("day")}
-                      >
-                        Дни
-                      </button>
-                      <button
-                        className={group === "week" ? "selected" : ""}
-                        onClick={() => setGroup("week")}
-                      >
-                        Недели
-                      </button>
-                      <button
-                        className={group === "month" ? "selected" : ""}
-                        onClick={() => setGroup("month")}
-                      >
-                        Месяцы
-                      </button>
-                    </div>
-                    {tab === 0 && (
-                      <Select
-                        label="Показатель графика"
-                        value={metric}
-                        onChange={chooseMetric}
-                        options={[
-                          { value: "amount", label: "Сумма заказов, ₽" },
-                          { value: "orders", label: "Заказано, шт." },
-                          { value: "bought", label: "Выкуплено, шт." },
-                          { value: "averagePrice", label: "Средняя цена, ₽" },
-                        ]}
-                      />
-                    )}
-                  </div>
-                  {tab === 0 && (
-                    <div className="chart-summary">
-                      <strong>
-                        {displayValue(
-                          metric,
-                          metricValue(chartView.total, metric),
-                        )}
-                      </strong>
-                      {change != null && (
-                        <span
-                          className={`change ${change < 0 ? "negative" : "positive"}`}
-                        >
-                          {change < 0 ? (
-                            <ArrowDownRight size={13} />
-                          ) : (
-                            <ArrowUpRight size={13} />
-                          )}{" "}
-                          {change > 0 ? "+" : ""}
-                          {fmt(change, 1)}% <small>к предыдущему периоду</small>
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  {tab === 0 && chartDiscrepancy && (
-                    <p className="chart-reconciliation">
-                      График по детализации:{" "}
-                      {displayValue(metric, chartDiscrepancy.detail)}
-                      {metrics[metric].unit === "шт." ? " шт." : ""}. Итог Excel
-                      отличается —{" "}
-                      <button onClick={() => setInfo(true)}>почему?</button>
-                    </p>
-                  )}
-                  {tab === 3 && (
-                    <>
-                      <div
-                        className="outcome-controls"
-                        aria-label="Статусы товаров"
-                      >
-                        {[
-                          ["all", "Все статусы"],
-                          ["cancelled", "Отмены"],
-                          ["returned", "Возвраты"],
-                        ].map(([key, title]) => (
-                          <button
-                            key={key}
-                            aria-pressed={outcome === key}
-                            className={outcome === key ? "selected" : ""}
-                            onClick={() => chooseOutcome(key)}
-                          >
-                            {title}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="quality-summary">
-                        <div>
-                          <span>Отменено за период</span>
-                          <strong>
-                            {fmt(total.cancelled)} <small>шт.</small>
-                          </strong>
-                          <em>
-                            {percent(ratio(total.cancelled, total.orders))} от
-                            заказанных
-                          </em>
-                        </div>
-                        <div>
-                          <span>Возвращено за период</span>
-                          <strong>
-                            {fmt(total.returned)} <small>шт.</small>
-                          </strong>
-                          <em>
-                            {percent(ratio(total.returned, total.orders))} от
-                            заказанных
-                          </em>
-                        </div>
-                      </div>
-                      <div className="legend">
-                        <span>
-                          <i style={{ background: "#ff7839" }} />
-                          Отменено
-                        </span>
-                        <span>
-                          <i style={{ background: "#343b52" }} />
-                          Возвращено
-                        </span>
-                      </div>
-                    </>
-                  )}
-                  <Chart
-                    days={chartView.days}
-                    metric={metric}
-                    group={effectiveGroup}
-                    outcome={outcome}
-                    quality={tab === 3}
-                    type={tab === 3 ? "bar" : chartType}
-                    height={tab === 3 ? 250 : 230}
-                  />
-                  <div className="chart-bottom">
-                    <span>
-                      {effectiveGroup === "week"
-                        ? "По неделям · неполные недели учтены в выбранных датах"
-                        : effectiveGroup === "month"
-                          ? "По месяцам · только дни выбранного периода"
-                          : "Наведите на точку, чтобы увидеть значения"}
-                    </span>
-                    {tab === 0 && (
-                      <button
-                        className="text-button"
-                        onClick={() =>
-                          setChartType((v) => (v === "area" ? "bar" : "area"))
-                        }
-                      >
-                        {chartType === "area" ? "Столбцы" : "Линия"}
-                        <ArrowUpDown size={12} />
-                      </button>
-                    )}
-                  </div>
-                </Card>
-                <Card className="gauge-card">
-                  <div className="card-heading">
-                    <h2>Процент выкупа</h2>
-                    <span title="Выкуплено / заказано × 100%">
-                      <Info size={15} />
-                    </span>
-                  </div>
-                  <Gauge
-                    value={buyout}
-                    bought={total.bought}
-                    orders={total.orders}
-                  />
-                  <p className="gauge-caption">
-                    Доля товаров, которые не отменили
-                    <br />и не вернули после заказа
-                  </p>
-                </Card>
-                {tab === 0 ? (
-                  <Card className="funnel-card">
-                    <div className="card-heading">
-                      <h2>Воронка за период</h2>
-                      <button
-                        className="icon-button"
-                        aria-label="Подробнее о воронке"
-                        onClick={() => setTab(2)}
-                      >
-                        <ArrowUpRight size={17} />
-                      </button>
-                    </div>
-                    <Funnel total={total} />
-                  </Card>
-                ) : (
-                  <Insights view={view} />
+            <div className="filter-bar">
+              <div className="search-field">
+                <Search size={17} />
+                <input
+                  aria-label="Поиск товаров"
+                  placeholder="Название, артикул или SKU"
+                  value={filters.query}
+                  onChange={(e) => update("query", e.target.value)}
+                />
+                {filters.query && (
+                  <button
+                    className="bare-button"
+                    aria-label="Очистить поиск"
+                    onClick={() => update("query", "")}
+                  >
+                    <X size={15} />
+                  </button>
                 )}
               </div>
-            )}
+              <div className="filters">
+                <SlidersHorizontal size={15} />
+                <label>
+                  <span className="sr-only">Класс ABC</span>
+                  <Select
+                    label="Класс ABC"
+                    value={filters.abc}
+                    onChange={(value) => update("abc", value)}
+                    options={[
+                      { value: "all", label: "Все классы ABC" },
+                      { value: "A", label: "Класс A" },
+                      { value: "B", label: "Класс B" },
+                      { value: "C", label: "Класс C" },
+                      { value: "—", label: "Без класса" },
+                    ]}
+                  />
+                </label>
+                <label>
+                  <span className="sr-only">Схема работы</span>
+                  <Select
+                    label="Схема работы"
+                    value={filters.scheme}
+                    onChange={(value) => update("scheme", value)}
+                    options={[
+                      { value: "all", label: "FBO + FBS" },
+                      { value: "FBO", label: "Есть FBO" },
+                      { value: "FBS", label: "Есть FBS" },
+                    ]}
+                  />
+                </label>
+                {activeFilters && (
+                  <button className="text-button" onClick={reset}>
+                    <RotateCcw size={13} />
+                    Сбросить
+                  </button>
+                )}
+              </div>
+              <button
+                className="text-button export-button"
+                onClick={exportCsv}
+                disabled={view.empty}
+              >
+                <Download size={15} />
+                Экспорт CSV
+              </button>
+            </div>
             {tab === 0 && (
-              <div className="bottom-grid">
-                <ProductTable
-                  products={tableProducts}
-                  metric={metric}
-                  compact
-                  sort={sort}
-                  onSort={onSort}
-                  onProduct={setProductSku}
-                  onAll={() => setTab(1)}
-                />
-                <Insights view={view} onQuality={() => setTab(3)} />
+              <div className="metrics-grid">
+                <Metric
+                  title="Заказано на сумму"
+                  value={money(total.amount)}
+                  active={metric === "amount"}
+                  onClick={() => chooseMetric("amount")}
+                >
+                  Включая отмены и возвраты
+                </Metric>
+                <Metric
+                  title="Заказано товаров"
+                  active={metric === "orders"}
+                  onClick={() => chooseMetric("orders")}
+                  value={fmt(total.orders)}
+                  suffix="шт."
+                >
+                  {fmt(view.products.length)} SKU в выбранных данных
+                </Metric>
+                <Metric
+                  title="Выкуплено товаров"
+                  active={metric === "bought"}
+                  onClick={() => chooseMetric("bought")}
+                  value={fmt(total.bought)}
+                  suffix="шт."
+                >
+                  <span className="green-dot" />
+                  {percent(buyout)} от заказанных
+                </Metric>
+                <Metric
+                  title="Средняя цена"
+                  active={metric === "averagePrice"}
+                  onClick={() => chooseMetric("averagePrice")}
+                  value={
+                    total.orders
+                      ? money(Math.round(total.amount / total.orders))
+                      : "—"
+                  }
+                >
+                  Сумма заказов / количество товаров
+                </Metric>
               </div>
             )}
-            {tab === 1 && (
-              <ProductTable
-                products={tableProducts}
-                metric={metric}
-                onMetricChange={chooseMetric}
-                sort={sort}
-                onSort={onSort}
-                onProduct={setProductSku}
-              />
-            )}
-            {tab === 2 && (
-              <div className="funnel-page">
-                <Card>
-                  <div className="card-heading">
-                    <h2>От показа к заказу</h2>
-                    <span className="chip">
-                      {fmt(view.products.length)} SKU
-                    </span>
+            {view.empty ? (
+              <Card>
+                <Empty reset={reset} />
+              </Card>
+            ) : (
+              <>
+                {(tab === 0 || tab === 3) && (
+                  <div
+                    className={`overview-grid ${tab === 3 ? "quality-grid" : ""}`}
+                  >
+                    <Card className="trend-card">
+                      <div className="card-heading">
+                        <div>
+                          <h2>
+                            {tab === 3
+                              ? "Отмены и возвраты"
+                              : metrics[metric].title}
+                          </h2>
+                          <p>
+                            {dateLabel(chartFilters.start)} —{" "}
+                            {dateLabel(chartFilters.end, {
+                              day: "numeric",
+                              month: "long",
+                              year: "numeric",
+                            })}
+                          </p>
+                        </div>
+                        <span className="chip">
+                          {view.days.length} дн. ·{" "}
+                          {group === "auto"
+                            ? "автомасштаб"
+                            : "выбранный период"}
+                        </span>
+                      </div>
+                      <div className="chart-controls">
+                        <div className="segmented">
+                          <button
+                            aria-pressed={group === "auto"}
+                            className={group === "auto" ? "selected" : ""}
+                            onClick={() => setGroup("auto")}
+                          >
+                            Авто
+                          </button>
+                          <button
+                            className={group === "day" ? "selected" : ""}
+                            onClick={() => setGroup("day")}
+                          >
+                            Дни
+                          </button>
+                          <button
+                            className={group === "week" ? "selected" : ""}
+                            onClick={() => setGroup("week")}
+                          >
+                            Недели
+                          </button>
+                          <button
+                            className={group === "month" ? "selected" : ""}
+                            onClick={() => setGroup("month")}
+                          >
+                            Месяцы
+                          </button>
+                        </div>
+                        {tab === 0 && (
+                          <Select
+                            label="Показатель графика"
+                            value={metric}
+                            onChange={chooseMetric}
+                            options={[
+                              { value: "amount", label: "Сумма заказов, ₽" },
+                              { value: "orders", label: "Заказано, шт." },
+                              { value: "bought", label: "Выкуплено, шт." },
+                              {
+                                value: "averagePrice",
+                                label: "Средняя цена, ₽",
+                              },
+                            ]}
+                          />
+                        )}
+                      </div>
+                      {tab === 0 && (
+                        <div className="chart-summary">
+                          <strong>
+                            {displayValue(
+                              metric,
+                              metricValue(chartView.total, metric),
+                            )}
+                          </strong>
+                          {change != null && (
+                            <span
+                              className={`change ${change < 0 ? "negative" : "positive"}`}
+                            >
+                              {change < 0 ? (
+                                <ArrowDownRight size={13} />
+                              ) : (
+                                <ArrowUpRight size={13} />
+                              )}{" "}
+                              {change > 0 ? "+" : ""}
+                              {fmt(change, 1)}%{" "}
+                              <small>к предыдущему периоду</small>
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {tab === 0 && chartDiscrepancy && (
+                        <p className="chart-reconciliation">
+                          График по детализации:{" "}
+                          {displayValue(metric, chartDiscrepancy.detail)}
+                          {metrics[metric].unit === "шт." ? " шт." : ""}. Итог
+                          Excel отличается —{" "}
+                          <button onClick={() => setInfo(true)}>почему?</button>
+                        </p>
+                      )}
+                      {tab === 3 && (
+                        <>
+                          <div
+                            className="outcome-controls"
+                            aria-label="Статусы товаров"
+                          >
+                            {[
+                              ["all", "Все статусы"],
+                              ["cancelled", "Отмены"],
+                              ["returned", "Возвраты"],
+                            ].map(([key, title]) => (
+                              <button
+                                key={key}
+                                aria-pressed={outcome === key}
+                                className={outcome === key ? "selected" : ""}
+                                onClick={() => chooseOutcome(key)}
+                              >
+                                {title}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="quality-summary">
+                            <div>
+                              <span>Отменено за период</span>
+                              <strong>
+                                {fmt(total.cancelled)} <small>шт.</small>
+                              </strong>
+                              <em>
+                                {percent(ratio(total.cancelled, total.orders))}{" "}
+                                от заказанных
+                              </em>
+                            </div>
+                            <div>
+                              <span>Возвращено за период</span>
+                              <strong>
+                                {fmt(total.returned)} <small>шт.</small>
+                              </strong>
+                              <em>
+                                {percent(ratio(total.returned, total.orders))}{" "}
+                                от заказанных
+                              </em>
+                            </div>
+                          </div>
+                          <div className="legend">
+                            <span>
+                              <i style={{ background: "#ff7839" }} />
+                              Отменено
+                            </span>
+                            <span>
+                              <i style={{ background: "#343b52" }} />
+                              Возвращено
+                            </span>
+                          </div>
+                        </>
+                      )}
+                      <Chart
+                        days={chartView.days}
+                        metric={metric}
+                        group={effectiveGroup}
+                        outcome={outcome}
+                        quality={tab === 3}
+                        type={tab === 3 ? "bar" : chartType}
+                        height={tab === 3 ? 250 : 230}
+                      />
+                      <div className="chart-bottom">
+                        <span>
+                          {effectiveGroup === "week"
+                            ? "По неделям · неполные недели учтены в выбранных датах"
+                            : effectiveGroup === "month"
+                              ? "По месяцам · только дни выбранного периода"
+                              : "Наведите на точку, чтобы увидеть значения"}
+                        </span>
+                        {tab === 0 && (
+                          <button
+                            className="text-button"
+                            onClick={() =>
+                              setChartType((v) =>
+                                v === "area" ? "bar" : "area",
+                              )
+                            }
+                          >
+                            {chartType === "area" ? "Столбцы" : "Линия"}
+                            <ArrowUpDown size={12} />
+                          </button>
+                        )}
+                      </div>
+                    </Card>
+                    <Card className="gauge-card">
+                      <div className="card-heading">
+                        <h2>Процент выкупа</h2>
+                        <span title="Выкуплено / заказано × 100%">
+                          <Info size={15} />
+                        </span>
+                      </div>
+                      <Gauge
+                        value={buyout}
+                        bought={total.bought}
+                        orders={total.orders}
+                      />
+                      <p className="gauge-caption">
+                        Доля товаров, которые не отменили
+                        <br />и не вернули после заказа
+                      </p>
+                    </Card>
+                    {tab === 0 ? (
+                      <Card className="funnel-card">
+                        <div className="card-heading">
+                          <h2>Воронка за период</h2>
+                          <button
+                            className="icon-button"
+                            aria-label="Подробнее о воронке"
+                            onClick={() => setTab(2)}
+                          >
+                            <ArrowUpRight size={17} />
+                          </button>
+                        </div>
+                        <Funnel total={total} />
+                      </Card>
+                    ) : (
+                      <Insights view={view} />
+                    )}
                   </div>
-                  <Funnel total={total} expanded />
-                  <p className="method-note">
-                    <Info size={16} />
-                    Отношения рассчитаны из суммарных событий выбранного
-                    периода. Это не путь уникального покупателя: заказ может
-                    прийти из другого канала, поэтому отношения могут превышать
-                    100%.
-                  </p>
-                </Card>
-                <Card className="funnel-dynamics">
-                  <div className="card-heading">
-                    <h2>Динамика воронки</h2>
-                    <Select
-                      label="Этап воронки"
-                      value={funnelMetric}
-                      onChange={setFunnelMetric}
-                      options={[
-                        { value: "impressions", label: "Показы" },
-                        { value: "visits", label: "Посещения" },
-                        { value: "cart", label: "Корзина" },
-                        { value: "orders", label: "Заказы" },
-                        { value: "amount", label: "Сумма заказов" },
-                      ]}
+                )}
+                {tab === 0 && (
+                  <div className="bottom-grid">
+                    <ProductTable
+                      products={tableProducts}
+                      metric={metric}
+                      compact
+                      sort={sort}
+                      onSort={onSort}
+                      onProduct={setProductSku}
+                      onAll={() => setTab(1)}
                     />
+                    <Insights view={view} onQuality={() => setTab(3)} />
                   </div>
-                  <Chart days={view.days} metric={funnelMetric} height={345} />
-                </Card>
-              </div>
+                )}
+                {tab === 1 && (
+                  <ProductTable
+                    products={tableProducts}
+                    metric={metric}
+                    onMetricChange={chooseMetric}
+                    sort={sort}
+                    onSort={onSort}
+                    onProduct={setProductSku}
+                  />
+                )}
+                {tab === 2 && (
+                  <div className="funnel-page">
+                    <Card>
+                      <div className="card-heading">
+                        <h2>От показа к заказу</h2>
+                        <span className="chip">
+                          {fmt(view.products.length)} SKU
+                        </span>
+                      </div>
+                      <Funnel total={total} expanded />
+                      <p className="method-note">
+                        <Info size={16} />
+                        Отношения рассчитаны из суммарных событий выбранного
+                        периода. Это не путь уникального покупателя: заказ может
+                        прийти из другого канала, поэтому отношения могут
+                        превышать 100%.
+                      </p>
+                    </Card>
+                    <Card className="funnel-dynamics">
+                      <div className="card-heading">
+                        <h2>Динамика воронки</h2>
+                        <Select
+                          label="Этап воронки"
+                          value={funnelMetric}
+                          onChange={setFunnelMetric}
+                          options={[
+                            { value: "impressions", label: "Показы" },
+                            { value: "visits", label: "Посещения" },
+                            { value: "cart", label: "Корзина" },
+                            { value: "orders", label: "Заказы" },
+                            { value: "amount", label: "Сумма заказов" },
+                          ]}
+                        />
+                      </div>
+                      <Chart
+                        days={view.days}
+                        metric={funnelMetric}
+                        height={345}
+                      />
+                    </Card>
+                  </div>
+                )}
+                {tab === 3 && (
+                  <ProductTable
+                    products={qualityProducts}
+                    metric={qualityMetric}
+                    quality
+                    sort={qualitySort}
+                    onSort={(key) =>
+                      setQualitySort((s) => ({
+                        key,
+                        dir: s.key === key && s.dir === "desc" ? "asc" : "desc",
+                      }))
+                    }
+                    onProduct={setProductSku}
+                  />
+                )}
+              </>
             )}
-            {tab === 3 && (
-              <ProductTable
-                products={qualityProducts}
-                metric={qualityMetric}
-                quality
-                sort={qualitySort}
-                onSort={(key) =>
-                  setQualitySort((s) => ({
-                    key,
-                    dir: s.key === key && s.dir === "desc" ? "asc" : "desc",
-                  }))
-                }
-                onProduct={setProductSku}
-              />
-            )}
+            <footer>
+              <button onClick={() => setInfo(true)}>
+                <Info size={13} />
+                {view.useSummary
+                  ? "Сводка по итоговой строке Excel"
+                  : "Расчёт по выбранным строкам Excel"}
+                {report.discrepancies.length > 0
+                  ? " · есть расхождения с детализацией"
+                  : ""}
+              </button>
+              <span>{report.fileName}</span>
+            </footer>
           </>
         )}
-        <footer>
-          <button onClick={() => setInfo(true)}>
-            <Info size={13} />
-            {view.useSummary
-              ? "Сводка по итоговой строке Excel"
-              : "Расчёт по выбранным строкам Excel"}
-            {report.discrepancies.length > 0
-              ? " · есть расхождения с детализацией"
-              : ""}
-          </button>
-          <span>{report.fileName}</span>
-        </footer>
       </main>
       {periodOpen && (
         <DateRangePicker
@@ -1559,81 +1623,91 @@ function App() {
         </Dialog>
       )}
       {info && (
-        <Dialog title="О данных и расчётах" wide onClose={() => setInfo(false)}>
-          <div className="info-content">
-            <div className="source-box">
-              <FileSpreadsheet size={26} />
-              <div>
-                <strong>{report.fileName}</strong>
-                <span>
-                  {fmt(report.rows.length)} строк ·{" "}
-                  {fmt(new Set(report.rows.map((r) => r.sku)).size)} SKU ·{" "}
-                  {report.seller}
-                </span>
-              </div>
-            </div>
-            <h3>Откуда берутся цифры</h3>
-            <p>
-              За весь период без фильтров сводные показатели берутся из строки
-              «Итого и среднее». После выбора дат, класса, схемы или поиска
-              показатели рассчитываются по строкам товаров. Графики и таблицы
-              всегда строятся по детализации.
-            </p>
-            {report.discrepancies.length > 0 && (
-              <>
-                <h3>Расхождения исходной выгрузки</h3>
-                <div className="discrepancy-list">
-                  {report.discrepancies.map((d) => (
-                    <div key={d.key}>
-                      <span>{labels[d.key] || d.key}</span>
-                      <span>
-                        Итог: <strong>{displayValue(d.key, d.summary)}</strong>
-                      </span>
-                      <span>
-                        Строки: <strong>{displayValue(d.key, d.detail)}</strong>
-                      </span>
-                    </div>
-                  ))}
+        <Dialog
+          title={tab === 4 ? "О рекламных данных" : "О данных и расчётах"}
+          wide
+          onClose={() => setInfo(false)}
+        >
+          {tab === 4 ? (
+            <AdvertisingMethod report={adsReport} />
+          ) : (
+            <div className="info-content">
+              <div className="source-box">
+                <FileSpreadsheet size={26} />
+                <div>
+                  <strong>{report.fileName}</strong>
+                  <span>
+                    {fmt(report.rows.length)} строк ·{" "}
+                    {fmt(new Set(report.rows.map((r) => r.sku)).size)} SKU ·{" "}
+                    {report.seller}
+                  </span>
                 </div>
-              </>
-            )}
-            <h3>Как читать показатели</h3>
-            <ul>
-              <li>
-                Сумма заказов включает отмены и возвраты. Это не чистая выручка
-                и не прибыль.
-              </li>
-              <li>
-                Средняя цена — сумма заказов, делённая на число заказанных
-                товаров.
-              </li>
-              <li>
-                Процент выкупа — выкупленные товары / заказанные товары. Доля
-                отмен и возвратов считается от заказанных товаров.
-              </li>
-              <li>
-                Остатки, рейтинги и отзывы нельзя складывать по дням. Здесь
-                остатки не суммируются, а ABC берётся из исходного отчёта.
-              </li>
-              <li>
-                FBO и FBS могут быть указаны вместе в одной строке. Фильтр «Есть
-                FBO/FBS» выбирает такие строки и не разделяет их продажи между
-                схемами.
-              </li>
-              <li>
-                Сравнение графика — с предыдущим периодом той же длины, только
-                если он целиком есть в выгрузке. Для последних дней возможны
-                более поздние отмены и возвраты.
-              </li>
-            </ul>
-            <h3>Ваши файлы остаются у вас</h3>
-            <p>
-              Excel обрабатывается в браузере и не отправляется на сервер.
-              Загруженный файл действует до обновления страницы. После
-              обновления открывается исходная выгрузка. CSV содержит только
-              выбранные товары.
-            </p>
-          </div>
+              </div>
+              <h3>Откуда берутся цифры</h3>
+              <p>
+                За весь период без фильтров сводные показатели берутся из строки
+                «Итого и среднее». После выбора дат, класса, схемы или поиска
+                показатели рассчитываются по строкам товаров. Графики и таблицы
+                всегда строятся по детализации.
+              </p>
+              {report.discrepancies.length > 0 && (
+                <>
+                  <h3>Расхождения исходной выгрузки</h3>
+                  <div className="discrepancy-list">
+                    {report.discrepancies.map((d) => (
+                      <div key={d.key}>
+                        <span>{labels[d.key] || d.key}</span>
+                        <span>
+                          Итог:{" "}
+                          <strong>{displayValue(d.key, d.summary)}</strong>
+                        </span>
+                        <span>
+                          Строки:{" "}
+                          <strong>{displayValue(d.key, d.detail)}</strong>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+              <h3>Как читать показатели</h3>
+              <ul>
+                <li>
+                  Сумма заказов включает отмены и возвраты. Это не чистая
+                  выручка и не прибыль.
+                </li>
+                <li>
+                  Средняя цена — сумма заказов, делённая на число заказанных
+                  товаров.
+                </li>
+                <li>
+                  Процент выкупа — выкупленные товары / заказанные товары. Доля
+                  отмен и возвратов считается от заказанных товаров.
+                </li>
+                <li>
+                  Остатки, рейтинги и отзывы нельзя складывать по дням. Здесь
+                  остатки не суммируются, а ABC берётся из исходного отчёта.
+                </li>
+                <li>
+                  FBO и FBS могут быть указаны вместе в одной строке. Фильтр
+                  «Есть FBO/FBS» выбирает такие строки и не разделяет их продажи
+                  между схемами.
+                </li>
+                <li>
+                  Сравнение графика — с предыдущим периодом той же длины, только
+                  если он целиком есть в выгрузке. Для последних дней возможны
+                  более поздние отмены и возвраты.
+                </li>
+              </ul>
+              <h3>Ваши файлы остаются у вас</h3>
+              <p>
+                Excel обрабатывается в браузере и не отправляется на сервер.
+                Загруженный файл действует до обновления страницы. После
+                обновления открывается исходная выгрузка. CSV содержит только
+                выбранные товары.
+              </p>
+            </div>
+          )}
         </Dialog>
       )}
       {importing && (

@@ -208,3 +208,108 @@ test("today and yesterday follow Moscow midnight instead of browser timezone", a
   assert.equal(moscowToday(new Date("2026-10-29T22:00:00Z")), "2026-10-30");
   assert.equal(dayBefore("2026-03-01"), "2026-02-28");
 });
+
+const adsReport = JSON.parse(
+  strFromU8(
+    gunzipSync(
+      readFileSync(
+        new URL("../public/data/advertising.json.gz", import.meta.url),
+      ),
+    ),
+  ),
+);
+const near = (actual, expected) =>
+  assert.ok(Math.abs(actual - expected) < 0.000001, `${actual} != ${expected}`);
+test("advertising totals reconcile actual Statistics and Union without double-counting models", async () => {
+  const { adView, adValue } = await import("../src/data/advertising.js");
+  const v = adView(adsReport);
+  assert.equal(adsReport.kind, "advertising");
+  assert.equal(adsReport.rows.length, 120);
+  assert.equal(adsReport.start, "2026-07-01");
+  assert.equal(adsReport.end, "2026-09-28");
+  near(v.total.spend, 159216.094866);
+  assert.equal(v.total.sales, 4141767);
+  assert.equal(v.total.units, 496);
+  assert.equal(v.total.modelSales, 230436);
+  assert.equal(v.total.modelUnits, 28);
+  assert.equal(adsReport.union.length, 25);
+  assert.equal(
+    adsReport.union.reduce((s, r) => s + r.sales, 0),
+    230436,
+  );
+  assert.deepEqual(adsReport.discrepancies, []);
+  near(adValue(v.total, "drr"), (159216.094866 / 4141767) * 100);
+  assert.equal(adValue({ sales: 0, spend: 100 }, "drr"), null);
+});
+test("advertising CPC ratios exclude pay-per-order aggregate and zeros use whole SKU attribution", async () => {
+  const { adView } = await import("../src/data/advertising.js");
+  const v = adView(adsReport);
+  near(v.cpc.spend, 129747.644866);
+  assert.equal(v.cpc.clicks, 43117);
+  assert.equal(v.cpc.impressions, 823917);
+  assert.equal(v.products.length, 102);
+  assert.equal(v.campaigns.filter((c) => c.id !== "0").length, 18);
+  assert.equal(v.zero.length, 35);
+  near(v.zeroSpend, 7993.495507);
+  assert.ok(
+    v.zero.every((p) => p.spend > 0 && p.sales === 0 && p.modelSales === 0),
+  );
+  const cpa = adView(adsReport, { tool: "cpa" });
+  near(cpa.total.spend, 29468.45);
+  assert.equal(cpa.total.units, 79);
+  assert.equal(cpa.products.length, 0);
+});
+test("advertising tool, campaign and SKU filters recompute all metrics and group duplicate SKU rows", async () => {
+  const { adView } = await import("../src/data/advertising.js");
+  const p = adView(adsReport, { query: "5330035142" });
+  assert.equal(p.products.length, 1);
+  near(p.total.spend, 12814.833779);
+  assert.equal(p.total.sales, 666546);
+  assert.equal(p.total.modelSales, 48985);
+  const c = adView(adsReport, { campaign: "35268477", query: "5330035142" });
+  near(c.total.spend, 10631.196743);
+  assert.equal(c.total.sales, 564349);
+  assert.equal(
+    adView(adsReport, { query: "несуществующий товар" }).rows.length,
+    0,
+  );
+});
+function advertisingWorkbook({ unionPeriod = "01.07.2026 - 28.09.2026" } = {}) {
+  const cell = (c, r, v) =>
+    `<c r="${c}${r}" t="inlineStr"><is><t>${v}</t></is></c>`;
+  const row = (n, vals) =>
+    `<row r="${n}">${Object.entries(vals)
+      .map(([c, v]) => cell(c, n, v))
+      .join("")}</row>`;
+  const stats = `<worksheet><dimension ref="A1:A1"/><sheetData>${row(1, { A: "Период: 01.07.2026 - 28.09.2026" })}${row(2, { A: "SKU", F: "Расход, ₽", H: "Продажи в продвижении, ₽", I: "Продано товаров, шт", M: "Показы", N: "Клики" })}${row(3, { A: "123", B: "Тест рекламного товара", C: "Оплата за клик", E: "7", F: "100", H: "1000", I: "2", J: "200", K: "1", M: "100", N: "10", O: "3" })}</sheetData></worksheet>`;
+  const union = `<worksheet><dimension ref="A1:A1"/><sheetData>${row(1, { A: "Период: " + unionPeriod })}${row(2, { A: "SKU в продвижении", F: "SKU из объединенной карточки" })}${row(3, { A: "123", E: "7", F: "456", H: "200", I: "1" })}</sheetData></worksheet>`;
+  return zipSync({
+    "xl/workbook.xml": strToU8(
+      '<workbook><sheets><sheet name="Statistics" r:id="r1"/><sheet name="Union" r:id="r2"/></sheets></workbook>',
+    ),
+    "xl/_rels/workbook.xml.rels": strToU8(
+      '<Relationships><Relationship Id="r1" Target="/xl/worksheets/sheet2.xml"/><Relationship Id="r2" Target="/xl/worksheets/sheet3.xml"/></Relationships>',
+    ),
+    "xl/worksheets/sheet2.xml": strToU8(stats),
+    "xl/worksheets/sheet3.xml": strToU8(union),
+  });
+}
+test("Excel advertising parser ignores broken dimensions and preserves Union as detail", () => {
+  const r = parseWorkbook(advertisingWorkbook(), "ads.xlsx");
+  assert.equal(r.kind, "advertising");
+  assert.equal(r.rows.length, 1);
+  assert.equal(r.rows[0].sales, 1000);
+  assert.equal(r.rows[0].modelSales, 200);
+  assert.equal(r.union[0].sales, 200);
+  assert.deepEqual(r.discrepancies, []);
+});
+test("advertising parser rejects mismatched reporting periods", () => {
+  assert.throws(
+    () =>
+      parseWorkbook(
+        advertisingWorkbook({ unionPeriod: "01.08.2026 - 28.09.2026" }),
+        "ads.xlsx",
+      ),
+    /Периоды листов/,
+  );
+});

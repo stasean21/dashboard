@@ -1,0 +1,474 @@
+.advertising {
+  min-width: 0;
+}
+.ad-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 18px;
+}
+.ad-subnav {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: #ffffff8c;
+  border: 1px solid #ffffffca;
+  border-radius: 25px;
+}
+.ad-subnav button {
+  border: 0;
+  background: transparent;
+  border-radius: 23px;
+  color: #8c96ad;
+  padding: 8px 18px;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.ad-subnav button.active {
+  background: #fff;
+  color: #38435d;
+  box-shadow: 0 2px 6px #222a3d06;
+}
+.ad-period-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #9da7ba;
+  font-size: 9px;
+}
+.ad-filter-bar {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  margin-bottom: 19px;
+}
+.ad-filter-selects {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ad-filter-selects .ui-select-trigger {
+  background: #ffffff80;
+  border: 1px solid #fff;
+}
+.ad-filter-bar > .search-field {
+  margin-left: auto;
+  width: 240px;
+}
+.ad-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 15px;
+}
+.ad-metric {
+  text-align: left;
+  cursor: pointer;
+  padding: 20px;
+  border: 1px solid transparent;
+  min-height: 132px;
+}
+.ad-metric:hover {
+  border-color: #ffbc95;
+  transform: translateY(-1px);
+}
+.ad-metric > span {
+  font-size: 12px;
+  font-weight: 550;
+}
+.ad-metric > strong {
+  display: block;
+  font-size: clamp(23px, 2.3vw, 35px);
+  font-weight: 600;
+  letter-spacing: -1px;
+  margin: 9px 0 6px;
+  white-space: nowrap;
+}
+.ad-metric small {
+  font-size: 0.58em;
+  font-weight: 500;
+}
+.ad-metric > p {
+  font-size: 9px;
+  color: #99a3b9;
+}
+.ad-metric.accent {
+  background: linear-gradient(115deg, #ff823b, #ff712c);
+  color: white;
+}
+.ad-metric.accent > p {
+  color: #fff9f3df;
+}
+.ad-middle {
+  display: grid;
+  grid-template-columns: 1.5fr 0.95fr 0.95fr;
+  gap: 14px;
+  margin-bottom: 15px;
+}
+.ad-middle .card-heading p,
+.ad-table-card .card-heading p {
+  font-size: 9px;
+  margin-top: 6px;
+  color: #9aa3b8;
+}
+.ad-middle .card-heading {
+  align-items: flex-start;
+}
+.ad-middle .card-heading h2 {
+  font-size: 15px;
+}
+.ad-budget-row {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin-bottom: 15px;
+  text-align: left;
+}
+.ad-budget-row:last-child {
+  margin-bottom: 0;
+}
+.ad-budget-row:disabled {
+  opacity: 1;
+  cursor: default;
+}
+.ad-budget-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-size: 10px;
+  margin-bottom: 7px;
+  color: #828da5;
+}
+.ad-budget-meta strong {
+  color: #52617b;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ad-budget-meta small {
+  color: #a8b0c2;
+  font-size: 8px;
+  font-weight: 450;
+}
+.ad-track {
+  height: 9px;
+  background: #f4f2f8;
+  border-radius: 10px;
+  display: block;
+  overflow: hidden;
+}
+.ad-track > span {
+  height: 100%;
+  border-radius: 10px;
+  display: block;
+  transition: width 0.25s;
+}
+.ad-budget-row:hover:not(:disabled) .ad-track > span {
+  filter: saturate(1.3);
+}
+.ad-donut {
+  width: 140px;
+  height: 140px;
+  margin: 15px auto 20px;
+  border-radius: 50%;
+  padding: 17px;
+}
+.ad-donut > div {
+  height: 100%;
+  width: 100%;
+  background: #fff;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+.ad-donut strong {
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.7px;
+}
+.ad-donut span {
+  font-size: 8px;
+  color: #9ea8bc;
+}
+.ad-tool-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 12px 0;
+  font-size: 10px;
+  color: #8d98b0;
+}
+.ad-tool-row > i {
+  height: 7px;
+  width: 7px;
+  border-radius: 50%;
+  background: #ff792f;
+}
+.ad-tool-row strong {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 550;
+  color: #67738b;
+}
+.ad-secondary-label {
+  display: block;
+  color: #a1aabe;
+  font-size: 9px;
+  margin-top: 22px;
+}
+.ad-roas {
+  font-size: 36px;
+  font-weight: 600;
+  letter-spacing: -1px;
+  margin: 4px 0 7px;
+}
+.ad-roas > span {
+  color: #a9b2c4;
+  font-size: 18px;
+  font-weight: 450;
+}
+.ad-efficiency {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  border-top: 1px solid #efeff5;
+  padding-top: 17px;
+  margin: 18px 0;
+}
+.ad-efficiency strong {
+  display: block;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.4px;
+}
+.ad-efficiency span {
+  display: block;
+  font-size: 8px;
+  color: #9ea9bd;
+  margin-top: 6px;
+}
+.ad-bottom {
+  display: grid;
+  grid-template-columns: 1.9fr 1fr;
+  gap: 14px;
+}
+.ad-table-card {
+  padding: 19px;
+}
+.ad-table-card table {
+  min-width: 640px;
+}
+.ad-table-card td:first-child {
+  width: 39%;
+  min-width: 210px;
+}
+.ad-table-card .product-button small {
+  font-size: 8px;
+  color: #a3adc1;
+  display: block;
+  margin-top: 4px;
+}
+.ad-table-card .product-name {
+  max-width: 370px;
+}
+.ad-number {
+  font-weight: 650;
+  color: #46536d;
+}
+.ad-attention-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 8px;
+  padding: 6px 9px;
+  border-radius: 20px;
+  background: #fff0e6;
+  color: #d97c48;
+}
+.ad-zero-amount {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.7px;
+  margin: 16px 0 9px;
+}
+.ad-description {
+  font-size: 10px;
+  color: #909cb4;
+  line-height: 1.85;
+  margin-bottom: 17px;
+}
+.ad-description strong {
+  font-weight: 600;
+}
+.ad-model-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border-top: 1px solid #efeff5;
+  padding-top: 16px;
+  margin-top: 20px;
+  color: #99a5bc;
+  font-size: 9px;
+}
+.ad-model-row small {
+  display: block;
+  font-size: 8px;
+  margin-top: 5px;
+}
+.ad-model-row strong {
+  font-weight: 600;
+  color: #6a7b98;
+  font-size: 17px;
+  white-space: nowrap;
+}
+.ad-attention-intro {
+  margin-bottom: 15px;
+}
+.ad-attention-intro > p {
+  color: #929eb5;
+  font-size: 11px;
+  line-height: 1.9;
+  max-width: 850px;
+}
+.ad-product-secondary {
+  display: flex;
+  gap: 25px;
+  flex-wrap: wrap;
+  color: #8c98b0;
+  font-size: 10px;
+}
+.ad-product-secondary strong {
+  color: #5b6b86;
+  margin-left: 6px;
+  font-weight: 550;
+}
+.ad-model-total {
+  color: #7b8ba7;
+  font-size: 12px;
+  margin-bottom: 16px;
+}
+.ad-sku {
+  display: block;
+  font-size: 8px;
+  color: #a2adc1;
+  margin-top: 4px;
+}
+.ad-report-period {
+  font-size: 11px;
+}
+@media (max-width: 1120px) {
+  .ad-middle {
+    grid-template-columns: 1fr 1fr;
+  }
+  .ad-budget {
+    grid-column: 1/-1;
+  }
+  .ad-bottom {
+    grid-template-columns: 1fr;
+  }
+  .ad-filter-bar {
+    flex-wrap: wrap;
+  }
+  .ad-filter-bar > .search-field {
+    width: 215px;
+  }
+  .ad-metric {
+    padding: 17px;
+  }
+  .ad-metric > strong {
+    font-size: 27px;
+  }
+}
+@media (max-width: 760px) {
+  .ad-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .ad-subnav {
+    width: 100%;
+  }
+  .ad-subnav button {
+    flex: 1;
+    padding: 8px 7px;
+    font-size: 9px;
+  }
+  .ad-period-note {
+    font-size: 8px;
+  }
+  .ad-filter-bar {
+    gap: 10px;
+  }
+  .ad-filter-selects {
+    width: 100%;
+  }
+  .ad-filter-selects .ui-select {
+    font-size: 10px;
+  }
+  .ad-filter-bar > .search-field {
+    width: auto;
+    flex: 1;
+    margin-left: 0;
+  }
+  .ad-filter-bar > .text-button {
+    font-size: 9px;
+  }
+  .ad-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .ad-metric {
+    padding: 16px;
+    min-height: 118px;
+  }
+  .ad-metric > span {
+    font-size: 10px;
+  }
+  .ad-metric > strong {
+    font-size: 24px;
+  }
+  .ad-metric > p {
+    font-size: 8px;
+    line-height: 1.7;
+  }
+  .ad-middle {
+    grid-template-columns: 1fr;
+  }
+  .ad-budget {
+    grid-column: auto;
+  }
+  .ad-metric:first-child > strong {
+    font-size: 21px;
+    letter-spacing: -0.9px;
+  }
+  .ad-tool-row {
+    font-size: 10px;
+  }
+  .ad-middle .card-heading h2 {
+    font-size: 14px;
+  }
+  .ad-budget-meta {
+    font-size: 9px;
+  }
+  .ad-budget-meta strong {
+    font-size: 10px;
+  }
+  .ad-table-card {
+    padding: 16px 12px;
+  }
+  .ad-table-card .card-heading {
+    flex-wrap: wrap;
+  }
+  .ad-model-row strong {
+    font-size: 16px;
+  }
+}

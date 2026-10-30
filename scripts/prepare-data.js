@@ -12,9 +12,11 @@ if (!input) {
 const report = parseWorkbook(readFileSync(input), basename(input));
 mkdirSync("public/data", { recursive: true });
 writeFileSync(
-  "public/data/report.json.gz",
+  report.kind === "advertising"
+    ? "public/data/advertising.json.gz"
+    : "public/data/report.json.gz",
   gzipSync(strToU8(JSON.stringify(report))),
 );
 console.log(
-  `Подготовлено ${report.rows.length} строк, ${new Set(report.rows.map((r) => r.sku)).size} SKU. Расхождений с итогом: ${report.discrepancies.length}.`,
+  `Подготовлено ${report.rows.length} строк, ${new Set(report.rows.filter((r) => report.kind !== "advertising" || r.sku !== "0").map((r) => r.sku)).size} SKU. Расхождений с итогом: ${report.discrepancies.length}.`,
 );
