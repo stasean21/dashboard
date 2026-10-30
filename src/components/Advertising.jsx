@@ -90,6 +90,7 @@ function AdTable({
   onSort,
   onRow,
   onAll,
+  renderPhoto,
 }) {
   const [page, setPage] = useState(0);
   useEffect(() => setPage(0), [rows, sort]);
@@ -178,11 +179,14 @@ function AdTable({
                         className="product-button"
                         onClick={() => onRow(row)}
                       >
-                        {kind !== "campaigns" && (
-                          <span className="product-icon">
-                            <Box size={20} />
-                          </span>
-                        )}
+                        {kind !== "campaigns" &&
+                          (renderPhoto ? (
+                            renderPhoto(row.sku)
+                          ) : (
+                            <span className="product-icon">
+                              <Box size={20} />
+                            </span>
+                          ))}
                         <span>
                           <span className="product-name">
                             {kind === "campaigns"
@@ -327,7 +331,7 @@ export function AdvertisingMethod({ report }) {
     </div>
   );
 }
-function ProductDetail({ product, report, onClose }) {
+function ProductDetail({ product, report, onClose, renderPhoto }) {
   const union = report.union.filter(
     (r) =>
       r.sourceSku === product.sku &&
@@ -339,9 +343,13 @@ function ProductDetail({ product, report, onClose }) {
   return (
     <Dialog title="Реклама товара" wide onClose={onClose}>
       <div className="product-detail-title">
-        <span className="product-icon large">
-          <Box size={27} />
-        </span>
+        {renderPhoto ? (
+          renderPhoto(product.sku, true)
+        ) : (
+          <span className="product-icon large">
+            <Box size={27} />
+          </span>
+        )}
         <div>
           <h3>{product.name}</h3>
           <p>SKU {product.sku}</p>
@@ -429,6 +437,7 @@ export default function Advertising({
   onInfo,
   onUpload,
   onReportPeriod,
+  renderPhoto,
 }) {
   const [tab, setTab] = useState("overview"),
     [tool, setTool] = useState("all"),
@@ -862,6 +871,7 @@ export default function Advertising({
           </div>
           <div className="ad-bottom">
             <AdTable
+              renderPhoto={renderPhoto}
               rows={products}
               compact
               sort={sort}
@@ -924,6 +934,7 @@ export default function Advertising({
             </Card>
           )}
           <AdTable
+            renderPhoto={renderPhoto}
             rows={rows}
             kind={tab}
             sort={sort}
@@ -942,6 +953,7 @@ export default function Advertising({
       </footer>
       {selected && (
         <ProductDetail
+          renderPhoto={renderPhoto}
           product={selected}
           report={report}
           onClose={() => setSku(null)}

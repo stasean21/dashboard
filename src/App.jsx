@@ -60,6 +60,16 @@ import Dialog from "./components/Dialog.jsx";
 import Advertising, { AdvertisingMethod } from "./components/Advertising.jsx";
 import DateRangePicker from "./components/DateRangePicker.jsx";
 import { calendarBounds } from "./data/calendar.js";
+import useCatalog from "./data/use-catalog.js";
+import { checksForMarket, offerId } from "./data/catalog.js";
+import ProductCatalog, { CatalogTabs } from "./components/ProductCatalog.jsx";
+import CatalogProduct from "./components/CatalogProduct.jsx";
+import ProductPhoto from "./components/ProductPhoto.jsx";
+import {
+  CatalogAlert,
+  CatalogSummary,
+  CatalogCheckDialog,
+} from "./components/CatalogChecks.jsx";
 import MarketplaceSwitcher, {
   MarketplaceEmpty,
   marketplaces,
@@ -515,6 +525,7 @@ function ProductTable({
   metric = "amount",
   quality = false,
   onMetricChange,
+  renderPhoto,
 }) {
   const [page, setPage] = useState(0);
   useEffect(() => setPage(0), [products, sort]);
@@ -620,9 +631,13 @@ function ProductTable({
                         className="product-button"
                         onClick={() => onProduct(p.sku)}
                       >
-                        <span className="product-icon">
-                          <Box size={21} />
-                        </span>
+                        {renderPhoto ? (
+                          renderPhoto(p.sku)
+                        ) : (
+                          <span className="product-icon">
+                            <Box size={21} />
+                          </span>
+                        )}
                         <span>
                           <span className="product-name">
                             {shortName(p.name)}
@@ -718,6 +733,56 @@ function App() {
     [importing, setImporting] = useState(false),
     [progress, setProgress] = useState(0),
     [toast, setToast] = useState("");
+  const [catalogMode, setCatalogMode] = useState("catalog"),
+    [catalogFilter, setCatalogFilter] = useState("all"),
+    [catalogProductId, setCatalogProductId] = useState(null),
+    [catalogCheckId, setCatalogCheckId] = useState(null);
+  const catalogStore = useCatalog(report, setToast),
+    catalog = catalogStore.catalog;
+  const catalogChecks = useMemo(
+    () => checksForMarket(catalog, marketplace),
+    [catalog, marketplace],
+  );
+  const selectedCatalogProduct =
+    catalog.rows.find((row) => row.id === catalogProductId) ||
+    (productSku
+      ? catalog.owner.get(offerId("ozon", report?.accountId, productSku))
+      : null);
+  const selectedCatalogCheck = catalog.checks.find(
+    (i) => i.id === catalogCheckId,
+  );
+  const isCatalogPage =
+    tab === 1 && catalogMode !== "analytics" && marketplace !== "yandex";
+  function openCatalogProduct(id) {
+    setCatalogProductId(id);
+    setProductSku(null);
+    setCatalogCheckId(null);
+  }
+  function openCatalogCheck(id) {
+    setCatalogCheckId(id);
+    setCatalogProductId(null);
+    setProductSku(null);
+  }
+  function openCatalogChecks(filter = "all") {
+    setTab(1);
+    setCatalogMode("checks");
+    setCatalogFilter(filter);
+    setCatalogProductId(null);
+    setProductSku(null);
+    setCatalogCheckId(null);
+  }
+  function renderCatalogPhoto(sku, large = false) {
+    const row = catalog.owner.get(offerId("ozon", report?.accountId, sku));
+    return (
+      <ProductPhoto
+        row={row}
+        settings={row ? catalogStore.state.cards[row.id] : undefined}
+        revision={catalogStore.photoRevision}
+        className={large ? "product-photo-medium" : ""}
+        decorative
+      />
+    );
+  }
   const [sort, setSort] = useState({ key: "amount", dir: "desc" });
   const [qualitySort, setQualitySort] = useState({
     key: "cancelled",
@@ -739,6 +804,9 @@ function App() {
     setInfo(false);
     setPeriodOpen(false);
     setToast("");
+    setCatalogProductId(null);
+    setCatalogCheckId(null);
+    setCatalogMode("catalog");
   }
   const effectiveFilters = useMemo(
     () => ({ ...filters, query: deferredQuery }),
@@ -748,6 +816,8 @@ function App() {
     setReport(next);
     setFilters({ ...defaults, start: next.minDate, end: next.maxDate });
     setProductSku(null);
+    setCatalogProductId(null);
+    setCatalogCheckId(null);
   }
   useEffect(() => {
     let active = true;
@@ -881,13 +951,13 @@ function App() {
     setFilters({ ...defaults, start: report.minDate, end: report.maxDate });
   async function importFile(file) {
     if (!file) return;
-    if (report && !hasMarketplaceData) {
+    if (report && marketplace === "yandex") {
       setToast(`Импорт ${marketplaces[marketplace].name} пока не подключён.`);
       return;
     }
     if (!/\.xlsx$/i.test(file.name)) {
       setToast(
-        "Поддерживается Excel .xlsx — отчёт Ozon по товарам или аналитика продвижения.",
+        "Поддерживается Excel .xlsx — отчёты Ozon по товарам и продвижению, либо воронка продаж WB для каталога.",
       );
       return;
     }
@@ -908,8 +978,21 @@ function App() {
       worker.onmessage = ({ data }) => {
         if (data.progress != null) setProgress(data.progress);
         if (data.report) {
-          setMarketplace((current) => (current === "all" ? "all" : "ozon"));
-          if (data.report.kind === "advertising") {
+          setCatalogProductId(null);
+          setCatalogCheckId(null);
+          setProductSku(null);
+          setMarketplace((current) =>
+            current === "all"
+              ? "all"
+              : data.report.kind === "catalog"
+                ? "wb"
+                : "ozon",
+          );
+          if (data.report.kind === "catalog") {
+            catalogStore.applyWb(data.report);
+            setTab(1);
+            setCatalogMode("catalog");
+          } else if (data.report.kind === "advertising") {
             adsImportedRef.current = true;
             setAdsReport(data.report);
             setAdsLoading(false);
@@ -1054,13 +1137,21 @@ function App() {
             <button
               key={name}
               className={tab === i ? "active" : ""}
-              onClick={() => setTab(i)}
+              onClick={() => {
+                setTab(i);
+                if (i === 1) setCatalogMode("catalog");
+              }}
             >
               {name}
             </button>
           ))}
         </nav>
         <div className="header-actions">
+          <CatalogAlert
+            checks={catalogChecks}
+            onOpen={openCatalogCheck}
+            onAll={openCatalogChecks}
+          />
           <button
             className="icon-button"
             title="О данных и расчётах"
@@ -1102,7 +1193,7 @@ function App() {
                       : "Выкуп, отмены и возвраты под контролем"}
             </p>
           </div>
-          {hasMarketplaceData && (
+          {(hasMarketplaceData || (tab === 1 && marketplace === "wb")) && (
             <div className="page-actions">
               <button
                 className="button date-button"
@@ -1127,14 +1218,18 @@ function App() {
                 className="button upload-button"
                 disabled={importing}
                 title={
-                  marketplace === "all" ? "Загрузить отчёт Ozon" : undefined
+                  isCatalogPage
+                    ? "Загрузить каталог из Excel Ozon или WB"
+                    : marketplace === "all"
+                      ? "Загрузить отчёт Ozon"
+                      : undefined
                 }
                 onClick={() => inputRef.current.click()}
               >
                 <Upload size={16} />
                 {importing
                   ? `${progress}%`
-                  : marketplace === "all"
+                  : marketplace === "all" && !isCatalogPage
                     ? "Загрузить Excel Ozon"
                     : "Загрузить Excel"}
               </button>
@@ -1145,13 +1240,15 @@ function App() {
           <div className="marketplace-coverage" role="note">
             <Info size={15} />
             <span>
-              Сейчас в общем режиме доступен только Ozon. Данные Wildberries и
-              Яндекс Маркета ещё не подключены.
+              {isCatalogPage
+                ? "Каталог содержит карточки Ozon и Wildberries. Данные продаж площадок сохраняются раздельно."
+                : "Сейчас в общем режиме доступен только Ozon. Каталог Wildberries доступен в разделе «Товары»; аналитика его продаж и Яндекс Маркета ещё не подключена."}
             </span>
           </div>
         )}
         {hasMarketplaceData &&
           tab !== 4 &&
+          !isCatalogPage &&
           (filters.start < report.minDate || filters.end > report.maxDate) && (
             <div className="period-coverage" role="note">
               <Info size={15} />
@@ -1174,7 +1271,31 @@ function App() {
             e.target.value = "";
           }}
         />
-        {!hasMarketplaceData ? (
+        {tab === 1 && marketplace !== "yandex" && (
+          <CatalogTabs
+            mode={catalogMode}
+            onChange={setCatalogMode}
+            count={catalogChecks.filter((i) => !i.resolved).length}
+            analytics={hasMarketplaceData}
+          />
+        )}
+        {isCatalogPage ? (
+          <ProductCatalog
+            catalog={catalog}
+            checks={catalogChecks}
+            mode={catalogMode}
+            filter={catalogFilter}
+            onFilter={setCatalogFilter}
+            marketplace={marketplace}
+            state={catalogStore.state}
+            photoRevision={catalogStore.photoRevision}
+            loading={catalogStore.loading}
+            error={catalogStore.error}
+            onOpen={openCatalogProduct}
+            onCheck={openCatalogCheck}
+            onUpload={() => inputRef.current.click()}
+          />
+        ) : !hasMarketplaceData ? (
           <MarketplaceEmpty
             name={marketplaces[marketplace].name}
             section={tabs[tab]}
@@ -1189,6 +1310,7 @@ function App() {
             onInfo={() => setInfo(true)}
             onUpload={() => inputRef.current.click()}
             onReportPeriod={(range) => setFilters((f) => ({ ...f, ...range }))}
+            renderPhoto={renderCatalogPhoto}
           />
         ) : (
           <>
@@ -1299,6 +1421,12 @@ function App() {
                   Сумма заказов / количество товаров
                 </Metric>
               </div>
+            )}
+            {tab === 0 && (
+              <CatalogSummary
+                checks={catalogChecks}
+                onAll={openCatalogChecks}
+              />
             )}
             {view.empty ? (
               <Card>
@@ -1544,7 +1672,11 @@ function App() {
                       sort={sort}
                       onSort={onSort}
                       onProduct={setProductSku}
-                      onAll={() => setTab(1)}
+                      renderPhoto={renderCatalogPhoto}
+                      onAll={() => {
+                        setTab(1);
+                        setCatalogMode("analytics");
+                      }}
                     />
                     <Insights view={view} onQuality={() => setTab(3)} />
                   </div>
@@ -1557,6 +1689,7 @@ function App() {
                     sort={sort}
                     onSort={onSort}
                     onProduct={setProductSku}
+                    renderPhoto={renderCatalogPhoto}
                   />
                 )}
                 {tab === 2 && (
@@ -1614,6 +1747,7 @@ function App() {
                       }))
                     }
                     onProduct={setProductSku}
+                    renderPhoto={renderCatalogPhoto}
                   />
                 )}
               </>
@@ -1633,84 +1767,134 @@ function App() {
           </>
         )}
       </main>
-      {hasMarketplaceData && periodOpen && (
-        <DateRangePicker
-          report={periodBounds}
-          hint={`Выбор действует во всех разделах. Продажи: ${dateLabel(report.minDate)} — ${dateLabel(report.maxDate)}.${adsReport ? ` Реклама: ${dateLabel(adsReport.start)} — ${dateLabel(adsReport.end)} (общий итог).` : ""}`}
-          value={{ start: filters.start, end: filters.end }}
-          onClose={() => setPeriodOpen(false)}
-          onApply={(range) => {
-            setFilters((f) => ({ ...f, ...range }));
-            setPeriodOpen(false);
+      {(hasMarketplaceData || (isCatalogPage && marketplace === "wb")) &&
+        periodOpen && (
+          <DateRangePicker
+            report={periodBounds}
+            hint={`Выбор действует во всех разделах. Продажи: ${dateLabel(report.minDate)} — ${dateLabel(report.maxDate)}.${adsReport ? ` Реклама: ${dateLabel(adsReport.start)} — ${dateLabel(adsReport.end)} (общий итог).` : ""}`}
+            value={{ start: filters.start, end: filters.end }}
+            onClose={() => setPeriodOpen(false)}
+            onApply={(range) => {
+              setFilters((f) => ({ ...f, ...range }));
+              setPeriodOpen(false);
+            }}
+          />
+        )}
+      {selectedCatalogProduct && (
+        <CatalogProduct
+          key={selectedCatalogProduct.id}
+          row={selectedCatalogProduct}
+          catalog={catalog}
+          settings={catalogStore.state.cards[selectedCatalogProduct.id] || {}}
+          photoRevision={catalogStore.photoRevision}
+          onClose={() => {
+            setCatalogProductId(null);
+            setProductSku(null);
           }}
-        />
-      )}
-      {hasMarketplaceData && selectedProduct && (
-        <Dialog
-          title="Карточка товара"
-          wide
-          onClose={() => setProductSku(null)}
+          onSave={(settings, photo) =>
+            catalogStore.saveCard(selectedCatalogProduct, settings, photo)
+          }
+          onLink={(ids) => catalogStore.link(selectedCatalogProduct, ids)}
+          onUnlink={() => catalogStore.unlink(selectedCatalogProduct)}
+          onCheck={openCatalogCheck}
         >
-          <div className="product-detail-title">
-            <span className="product-icon large">
-              <Box size={28} />
-            </span>
-            <div>
-              <h3>{selectedProduct.name}</h3>
-              <p>
-                SKU {selectedProduct.sku} · Артикул {selectedProduct.article}
+          {hasMarketplaceData && selectedProduct && (
+            <>
+              <h3>Аналитика Ozon за выбранный период</h3>
+              <div className="detail-metrics">
+                <div>
+                  <span>Сумма заказов</span>
+                  <strong>{money(selectedProduct.amount)}</strong>
+                </div>
+                <div>
+                  <span>Заказано</span>
+                  <strong>{fmt(selectedProduct.orders)} шт.</strong>
+                </div>
+                <div>
+                  <span>Выкуплено</span>
+                  <strong>{fmt(selectedProduct.bought)} шт.</strong>
+                </div>
+                <div>
+                  <span>Отменено / возвращено</span>
+                  <strong>
+                    {fmt(selectedProduct.cancelled)} /{" "}
+                    {fmt(selectedProduct.returned)}
+                  </strong>
+                </div>
+              </div>
+              <h3 className="detail-chart-title">Сумма заказов по дням</h3>
+              <Chart days={productDays} height={230} />
+              <p className="fineprint">
+                Период: {dateLabel(filters.start)} — {dateLabel(filters.end)}.
+                Рейтинг на последнюю доступную дату:{" "}
+                {selectedProduct.rating
+                  ? fmt(selectedProduct.rating, 1)
+                  : "нет данных"}
+                . ABC — класс из отчёта, не пересчитывается при фильтрации.
               </p>
-            </div>
-            <span className={`abc abc-${selectedProduct.abc}`}>
-              {selectedProduct.abc}
-            </span>
-          </div>
-          <div className="detail-metrics">
-            <div>
-              <span>Сумма заказов</span>
-              <strong>{money(selectedProduct.amount)}</strong>
-            </div>
-            <div>
-              <span>Заказано</span>
-              <strong>{fmt(selectedProduct.orders)} шт.</strong>
-            </div>
-            <div>
-              <span>Выкуплено</span>
-              <strong>{fmt(selectedProduct.bought)} шт.</strong>
-            </div>
-            <div>
-              <span>Отменено / возвращено</span>
-              <strong>
-                {fmt(selectedProduct.cancelled)} /{" "}
-                {fmt(selectedProduct.returned)}
-              </strong>
-            </div>
-          </div>
-          <h3 className="detail-chart-title">Сумма заказов по дням</h3>
-          <Chart days={productDays} height={230} />
-          <p className="fineprint">
-            Период: {dateLabel(filters.start)} — {dateLabel(filters.end)}.
-            Рейтинг на последнюю доступную дату:{" "}
-            {selectedProduct.rating
-              ? fmt(selectedProduct.rating, 1)
-              : "нет данных"}
-            . ABC — класс из отчёта, не пересчитывается при фильтрации.
-          </p>
-        </Dialog>
+            </>
+          )}
+        </CatalogProduct>
+      )}
+      {selectedCatalogCheck && (
+        <CatalogCheckDialog
+          key={selectedCatalogCheck.id}
+          check={selectedCatalogCheck}
+          catalog={catalog}
+          onClose={() => setCatalogCheckId(null)}
+          onResolve={(decision) =>
+            catalogStore.resolve(selectedCatalogCheck, decision)
+          }
+          onReopen={() => catalogStore.reopen(selectedCatalogCheck)}
+        />
       )}
       {info && (
         <Dialog
           title={
-            !hasMarketplaceData
-              ? `О данных ${marketplaces[marketplace].name}`
-              : tab === 4
-                ? "О рекламных данных"
-                : "О данных и расчётах"
+            isCatalogPage
+              ? "О каталоге товаров"
+              : !hasMarketplaceData
+                ? `О данных ${marketplaces[marketplace].name}`
+                : tab === 4
+                  ? "О рекламных данных"
+                  : "О данных и расчётах"
           }
           wide
           onClose={() => setInfo(false)}
         >
-          {!hasMarketplaceData ? (
+          {isCatalogPage ? (
+            <div className="info-content">
+              <h3>Каталог из Excel</h3>
+              <p>
+                Ozon: {catalog.sourceCounts.ozon} SKU. Wildberries:{" "}
+                {catalog.sourceCounts.wb} SKU. Карточки сопоставляются по
+                полному артикулу продавца; спорные случаи требуют решения.
+                Названия сами по себе не подтверждают совпадение.
+              </p>
+              <h3>Связи, себестоимость и фото</h3>
+              <p>
+                Настройки и решения сохраняются в браузере на этом устройстве,
+                фотографии — в локальном хранилище браузера. Серверной
+                синхронизации и подключения API пока нет. Ручные фото не
+                заменяются при импорте. Фото показываются в формате 3:4 без
+                растяжения.
+              </p>
+              <h3>Периоды источников</h3>
+              <p>
+                Каталог содержит все карточки загруженных выгрузок и не
+                обрезается календарём аналитики. Даты исходных файлов показаны у
+                карточек площадок. Импорт WB обновляет каталог; показатели
+                продаж Ozon остаются отдельным набором.
+              </p>
+              <h3>Ваши файлы</h3>
+              <p>
+                Excel обрабатывается локально. После обновления страницы
+                восстанавливаются встроенные выгрузки; принятые решения,
+                себестоимость и ручные фото сохраняются. Для общей истории
+                кабинетов потребуется сервер и API.
+              </p>
+            </div>
+          ) : !hasMarketplaceData ? (
             <div className="info-content">
               <p>
                 Отчёты {marketplaces[marketplace].name} пока не подключены.

@@ -7,7 +7,7 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "node tests/report.test.js",
+    "test": "node tests/report.test.js && node tests/catalog.test.js",
     "test:e2e": "playwright test",
     "format": "prettier --write src scripts tests *.js *.json *.html README.md"
   },

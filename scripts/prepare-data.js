@@ -14,9 +14,13 @@ mkdirSync("public/data", { recursive: true });
 writeFileSync(
   report.kind === "advertising"
     ? "public/data/advertising.json.gz"
-    : "public/data/report.json.gz",
+    : report.kind === "catalog" && report.marketplace === "wb"
+      ? "public/data/catalog-wb.json.gz"
+      : "public/data/report.json.gz",
   gzipSync(strToU8(JSON.stringify(report))),
 );
 console.log(
-  `Подготовлено ${report.rows.length} строк, ${new Set(report.rows.filter((r) => report.kind !== "advertising" || r.sku !== "0").map((r) => r.sku)).size} SKU. Расхождений с итогом: ${report.discrepancies.length}.`,
+  report.kind === "catalog"
+    ? `Подготовлен каталог WB: ${report.rows.length} SKU, период ${report.start} — ${report.end}.`
+    : `Подготовлено ${report.rows.length} строк, ${new Set(report.rows.filter((r) => report.kind !== "advertising" || r.sku !== "0").map((r) => r.sku)).size} SKU. Расхождений с итогом: ${report.discrepancies.length}.`,
 );

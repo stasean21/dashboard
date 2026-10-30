@@ -74,6 +74,16 @@ test("unconnected marketplaces hide Ozon sales and advertising in every section"
       await main(page)
         .getByRole("button", { name: section, exact: true })
         .click();
+      if (marketplace === "Wildberries" && section === "Товары") {
+        await expect(page.locator(".catalog-page")).toBeVisible();
+        await expect(
+          page.getByText("WB · 391 SKU", { exact: true }),
+        ).toBeVisible();
+        await expect(
+          page.locator(".metrics-grid,.ad-metrics,.chart"),
+        ).toHaveCount(0);
+        continue;
+      }
       await expect(page.locator(".marketplace-empty")).toContainText(
         `Данные ${marketplace} ещё не загружены`,
       );

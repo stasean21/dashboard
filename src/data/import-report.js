@@ -1,13 +1,16 @@
 import { openWorkbook } from "./read-xlsx.js";
 import { finishReport, normalizeRow } from "./report.js";
 import { parseAdWorkbook } from "./advertising.js";
+import { parseWildberriesCatalog } from "./wildberries.js";
 export function parseWorkbook(buffer, fileName, onProgress = () => {}) {
   const book = openWorkbook(buffer);
   if (book.has("Statistics"))
     return parseAdWorkbook(book, fileName, onProgress);
+  if (book.has("Товары") && book.has("Общая информация"))
+    return parseWildberriesCatalog(book, fileName);
   if (!book.has("По товарам"))
     throw new Error(
-      "В книге нет листа «По товарам» или Statistics. Нужен отчёт Ozon по товарам или аналитика продвижения.",
+      "В книге нет листа поддерживаемого отчёта. Нужен Ozon «По товарам», Statistics или воронка WB с листами «Товары» и «Общая информация».",
     );
   let seller = "",
     summary = null,

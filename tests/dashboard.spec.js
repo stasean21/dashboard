@@ -47,6 +47,9 @@ test("real report loads, product drilldown and date filters recalculate actual t
 test("search, ABC, sorting, pagination and CSV work", async ({ page }) => {
   await ready(page);
   await page.getByRole("button", { name: "Товары", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Аналитика Ozon", exact: true })
+    .click();
   await expect(page.locator("tbody tr")).toHaveCount(12);
   await page.getByRole("button", { name: "Следующая страница" }).click();
   await expect(page.locator(".pagination")).toContainText("13–24");
@@ -369,6 +372,10 @@ test("main KPI cards appear only in Overview and all section dropdowns use share
   await expect(page.locator(".metrics-grid .metric")).toHaveCount(4);
   for (const tab of ["Товары", "Воронка", "Качество"]) {
     await page.getByRole("button", { name: tab, exact: true }).click();
+    if (tab === "Товары")
+      await page
+        .getByRole("button", { name: "Аналитика Ozon", exact: true })
+        .click();
     await expect(page.locator(".metrics-grid")).toHaveCount(0);
     const abc = page.getByRole("combobox", { name: "Класс ABC", exact: true });
     await abc.click();
@@ -388,6 +395,9 @@ test("main KPI cards appear only in Overview and all section dropdowns use share
     await expect(page.locator("select,input[type=date]")).toHaveCount(0);
   }
   await page.getByRole("button", { name: "Товары", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Аналитика Ozon", exact: true })
+    .click();
   await page.getByRole("combobox", { name: "Показатель таблицы" }).click();
   await page
     .getByRole("option", { name: "Выкуплено товаров", exact: true })
