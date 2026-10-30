@@ -210,6 +210,22 @@ input {
   color: var(--muted);
   margin-top: 8px;
 }
+.period-coverage {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 13px 16px;
+  margin-bottom: 20px;
+  border: 1px solid #fff;
+  background: #ffffff91;
+  border-radius: 15px;
+  color: #7e89a3;
+  font-size: 11px;
+  line-height: 1.7;
+}
+.period-coverage svg {
+  flex-shrink: 0;
+}
 .page-actions {
   display: flex;
   gap: 9px;

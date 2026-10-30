@@ -148,11 +148,15 @@ export function getView(report, filters) {
     t += 86400000
   ) {
     const date = new Date(t).toISOString().slice(0, 10);
+    const unavailable = date < report.minDate || date > report.maxDate;
     days.push(
       dailyMap.get(date) || {
         date,
-        ...Object.fromEntries(sumFields.map((k) => [k, 0])),
+        ...Object.fromEntries(
+          sumFields.map((k) => [k, unavailable ? null : 0]),
+        ),
         missing: true,
+        unavailable,
       },
     );
   }

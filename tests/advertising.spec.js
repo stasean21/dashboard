@@ -12,6 +12,9 @@ async function ready(page) {
   await main(page)
     .getByRole("button", { name: "Реклама", exact: true })
     .click();
+  await page
+    .getByRole("button", { name: "Показать весь рекламный отчёт", exact: true })
+    .click();
   await expect(page.locator(".ad-metrics")).toBeVisible();
 }
 async function select(page, label, option) {
@@ -34,7 +37,7 @@ test("advertising totals and campaign/tool filters use the correct attribution s
   await expect(page.locator(".ad-report-period")).toContainText(
     /01.07.*28.09.2026/,
   );
-  await expect(page.locator(".date-button")).toHaveCount(0);
+  await expect(page.locator(".date-button")).toContainText(/01.07.*28.09.2026/);
   await select(page, "Рекламный инструмент", "Оплата за клик");
   await expect(page.locator(".ad-metric").first()).toContainText(
     /129\s*747,64/,
@@ -129,7 +132,9 @@ test("advertising Excel imports independently and refresh restores bundled data"
   await expect(page.locator(".ad-metric").first()).toContainText("100,00 ₽");
   await expect(page.locator(".ad-metric").nth(2)).toContainText("10%");
   await main(page).getByRole("button", { name: "Обзор", exact: true }).click();
-  await expect(page.locator(".metric").first()).toContainText(/8\s*151\s*692/);
+  await expect(page.locator(".date-button")).toContainText(/01.08.*31.08.2026/);
+  await expect(page.locator(".period-coverage")).toHaveCount(0);
+  await expect(page.locator(".metric").first()).toContainText(/825\s*739/);
   await main(page)
     .getByRole("button", { name: "Реклама", exact: true })
     .click();
@@ -138,9 +143,88 @@ test("advertising Excel imports independently and refresh restores bundled data"
   await main(page)
     .getByRole("button", { name: "Реклама", exact: true })
     .click();
+  await page
+    .getByRole("button", { name: "Показать весь рекламный отчёт", exact: true })
+    .click();
   await expect(page.locator(".ad-metric").first()).toContainText(
     /159\s*216,09/,
   );
+});
+
+test("one calendar drives sales, advertising and export; aggregate totals never appear under other dates", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("heading", { name: "Обзор продаж", exact: true })
+    .waitFor();
+  const initial = await page.locator(".date-button").innerText();
+  await main(page)
+    .getByRole("button", { name: "Реклама", exact: true })
+    .click();
+  await expect(page.locator(".date-button")).toHaveText(initial);
+  await expect(page.locator(".ad-period-unavailable")).toContainText(
+    "В файле нет разбивки по дням",
+  );
+  await expect(page.locator(".ad-metric,table")).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Показать весь рекламный отчёт", exact: true })
+    .click();
+  await expect(page.locator(".date-button")).toContainText(/01.07.*28.09.2026/);
+  await expect(page.locator(".ad-metric").first()).toContainText(
+    /159\s*216,09/,
+  );
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Экспорт CSV", exact: true }).click();
+  expect((await download).suggestedFilename()).toBe(
+    "formula_ads_2026-07-01_2026-09-28_overview.csv",
+  );
+  await main(page).getByRole("button", { name: "Обзор", exact: true }).click();
+  await expect(page.locator(".date-button")).toContainText(/01.07.*28.09.2026/);
+  await expect(page.locator(".period-coverage")).toBeVisible();
+  await expect(page.locator(".metric").first()).toContainText(/4\s*305\s*440/);
+  await main(page)
+    .getByRole("button", { name: "Реклама", exact: true })
+    .click();
+  await page.locator(".date-button").click();
+  await page
+    .getByRole("button", { name: "Предыдущий месяц", exact: true })
+    .click();
+  await page
+    .locator('.range-month [data-calendar-date="2026-07-01"]')
+    .first()
+    .click();
+  await page
+    .locator('.range-month [data-calendar-date="2026-07-01"]')
+    .first()
+    .click();
+  await page
+    .getByRole("button", { name: "Применить период", exact: true })
+    .click();
+  await expect(page.locator(".date-button")).toContainText(/01.07.*01.07.2026/);
+  await expect(page.locator(".ad-metric,table")).toHaveCount(0);
+  await expect(page.locator(".ad-period-unavailable")).toContainText(
+    "Выбрано: 01.07 — 01.07.2026",
+  );
+  await main(page).getByRole("button", { name: "Обзор", exact: true }).click();
+  await expect(page.locator(".date-button")).toContainText(/01.07.*01.07.2026/);
+  await expect(page.locator(".metrics-grid,.chart")).toHaveCount(0);
+  await expect(page.locator(".period-coverage")).toContainText(
+    "За выбранный период нет данных продаж",
+  );
+  await main(page)
+    .getByRole("button", { name: "Реклама", exact: true })
+    .click();
+  await page.locator(".date-button").click();
+  await page.getByRole("button", { name: "7 дней", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Применить период", exact: true })
+    .click();
+  await expect(page.locator(".ad-period-unavailable")).toContainText(
+    "За выбранный период нет рекламных данных",
+  );
+  await main(page).getByRole("button", { name: "Товары", exact: true }).click();
+  await expect(page.locator(".date-button")).toContainText(/23.10.*29.10.2026/);
 });
 test("advertising mobile layout, custom menus and explanatory dialog work", async ({
   page,

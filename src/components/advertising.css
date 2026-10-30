@@ -1,6 +1,39 @@
 .advertising {
   min-width: 0;
 }
+.ad-period-unavailable .empty {
+  min-height: 360px;
+  padding: 45px 24px;
+}
+.ad-period-unavailable h2 {
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 600;
+  margin: 15px 0 13px;
+}
+.ad-period-unavailable p {
+  max-width: 620px;
+  line-height: 1.9;
+}
+.ad-period-unavailable .ad-source-period {
+  color: #69758f;
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+.ad-period-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 24px 0 10px;
+}
+.ad-period-unavailable .ad-period-actions .button {
+  margin: 0;
+}
+.ad-period-unavailable .ad-period-actions .button.primary {
+  background: #252d41;
+  color: #fff;
+}
 .ad-toolbar {
   display: flex;
   justify-content: space-between;

@@ -23,7 +23,13 @@ const fullDate = (value) =>
 const shortDate = (value) =>
   dateLabel(value, { day: "numeric", month: "long" });
 const monthName = (value) => dateLabel(value, { month: "long" });
-export default function DateRangePicker({ report, value, onApply, onClose }) {
+export default function DateRangePicker({
+  report,
+  value,
+  onApply,
+  onClose,
+  hint,
+}) {
   const [draft, setDraft] = useState(() => ({ ...value })),
     [anchor, setAnchor] = useState(null),
     [hover, setHover] = useState("");
@@ -174,8 +180,12 @@ export default function DateRangePicker({ report, value, onApply, onClose }) {
         <div>
           <h2 id="range-title">Выберите период</h2>
           <p>
-            Данные доступны с {shortDate(report.minDate)} по{" "}
-            {fullDate(report.maxDate)}
+            {hint || (
+              <>
+                Данные доступны с {shortDate(report.minDate)} по{" "}
+                {fullDate(report.maxDate)}
+              </>
+            )}
           </p>
         </div>
         <button className="icon-button" aria-label="Закрыть" onClick={onClose}>

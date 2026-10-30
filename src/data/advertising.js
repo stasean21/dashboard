@@ -63,10 +63,38 @@ export function groupAdCampaigns(rows) {
     ...adTotals(rr),
   }));
 }
+export function adPeriodStatus(
+  report,
+  { start = report.start, end = report.end } = {},
+) {
+  const available = start === report.start && end === report.end;
+  return {
+    available,
+    reason: available
+      ? ""
+      : end < report.start || start > report.end
+        ? "outside"
+        : "aggregate",
+    start,
+    end,
+  };
+}
 export function adView(
   report,
-  { tool = "all", campaign = "all", query = "" } = {},
+  { tool = "all", campaign = "all", query = "", start, end } = {},
 ) {
+  const period = adPeriodStatus(report, { start, end });
+  if (!period.available)
+    return {
+      period,
+      rows: [],
+      total: null,
+      cpc: null,
+      products: [],
+      campaigns: [],
+      zero: [],
+      zeroSpend: null,
+    };
   const needle = query.trim().toLocaleLowerCase("ru");
   const rows = report.rows.filter(
     (r) =>
@@ -82,6 +110,7 @@ export function adView(
     (p) => p.spend > 0 && p.sales === 0 && p.modelSales === 0,
   );
   return {
+    period,
     rows,
     total: adTotals(rows),
     cpc,

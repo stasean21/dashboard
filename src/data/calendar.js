@@ -1,4 +1,10 @@
 export const toISO = (d) => d.toISOString().slice(0, 10);
+// One selectable range across sales and advertising, with coverage checked per source.
+export function calendarBounds(sales, advertising) {
+  const starts = [sales?.minDate, advertising?.start].filter(Boolean).sort();
+  const ends = [sales?.maxDate, advertising?.end].filter(Boolean).sort();
+  return { minDate: starts[0] || "", maxDate: ends.at(-1) || "" };
+}
 export const dateUTC = (value) => new Date(value + "T00:00:00Z");
 export const monthStart = (value) => value.slice(0, 7) + "-01";
 export function shiftMonth(value, delta) {

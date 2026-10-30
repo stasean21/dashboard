@@ -45,9 +45,10 @@ test("marketplace control is beside the profile and general mode preserves actua
   await main(page)
     .getByRole("button", { name: "Реклама", exact: true })
     .click();
-  await expect(page.locator(".ad-metric").first()).toContainText(
-    /159\s*216,09/,
+  await expect(page.locator(".ad-period-unavailable")).toContainText(
+    "В файле нет разбивки по дням",
   );
+  await expect(page.locator(".date-button")).toContainText(/30.07.*29.10.2026/);
   await select(page, "Ozon");
   await expect(page.locator(".marketplace-coverage")).toHaveCount(0);
   await main(page).getByRole("button", { name: "Обзор", exact: true }).click();

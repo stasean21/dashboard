@@ -59,6 +59,7 @@ import Select from "./components/Select.jsx";
 import Dialog from "./components/Dialog.jsx";
 import Advertising, { AdvertisingMethod } from "./components/Advertising.jsx";
 import DateRangePicker from "./components/DateRangePicker.jsx";
+import { calendarBounds } from "./data/calendar.js";
 import MarketplaceSwitcher, {
   MarketplaceEmpty,
   marketplaces,
@@ -700,6 +701,10 @@ function App() {
     [adsLoading, setAdsLoading] = useState(true),
     [adsError, setAdsError] = useState("");
   const adsImportedRef = useRef(false);
+  const periodBounds = useMemo(
+    () => calendarBounds(report, adsReport),
+    [report, adsReport],
+  );
   const [filters, setFilters] = useState({ start: "", end: "", ...defaults });
   const [tab, setTab] = useState(0),
     [periodOpen, setPeriodOpen] = useState(false);
@@ -861,7 +866,7 @@ function App() {
       ...Object.fromEntries(
         Object.keys(labels)
           .filter((k) => k !== "averagePrice")
-          .map((k) => [k, 0]),
+          .map((k) => [k, d.unavailable ? null : 0]),
       ),
     }));
     const byDate = new Map(days.map((d) => [d.date, d]));
@@ -909,6 +914,11 @@ function App() {
             setAdsReport(data.report);
             setAdsLoading(false);
             setAdsError("");
+            setFilters((f) => ({
+              ...f,
+              start: data.report.start,
+              end: data.report.end,
+            }));
             setTab(4);
           } else {
             applyReport(data.report);
@@ -1033,6 +1043,8 @@ function App() {
     view.useSummary && report.discrepancies.find((d) => d.key === metric);
   const activeFilters =
     filters.query || filters.abc !== "all" || filters.scheme !== "all";
+  const salesRangeOutside =
+    filters.end < report.minDate || filters.start > report.maxDate;
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -1092,39 +1104,25 @@ function App() {
           </div>
           {hasMarketplaceData && (
             <div className="page-actions">
-              {tab === 4 ? (
-                <span
-                  className="button ad-report-period"
-                  title="В файле итоги за весь период; разбивки по дням нет"
-                >
-                  <CalendarDays size={17} />
-                  {adsReport
-                    ? `${dateLabel(adsReport.start, { day: "2-digit", month: "2-digit" })} — ${dateLabel(adsReport.end, { day: "2-digit", month: "2-digit", year: "numeric" })}`
-                    : "Рекламный отчёт"}
-                </span>
-              ) : (
-                <>
-                  <button
-                    className="button date-button"
-                    onClick={() => {
-                      setPeriodOpen(true);
-                    }}
-                  >
-                    <CalendarDays size={17} />
-                    {dateLabel(filters.start, {
-                      day: "2-digit",
-                      month: "2-digit",
-                    })}{" "}
-                    —{" "}
-                    {dateLabel(filters.end, {
-                      day: "2-digit",
-                      month: "2-digit",
-                      year: "numeric",
-                    })}
-                    <ChevronDown size={14} />
-                  </button>
-                </>
-              )}
+              <button
+                className="button date-button"
+                onClick={() => {
+                  setPeriodOpen(true);
+                }}
+              >
+                <CalendarDays size={17} />
+                {dateLabel(filters.start, {
+                  day: "2-digit",
+                  month: "2-digit",
+                })}{" "}
+                —{" "}
+                {dateLabel(filters.end, {
+                  day: "2-digit",
+                  month: "2-digit",
+                  year: "numeric",
+                })}
+                <ChevronDown size={14} />
+              </button>
               <button
                 className="button upload-button"
                 disabled={importing}
@@ -1152,6 +1150,20 @@ function App() {
             </span>
           </div>
         )}
+        {hasMarketplaceData &&
+          tab !== 4 &&
+          (filters.start < report.minDate || filters.end > report.maxDate) && (
+            <div className="period-coverage" role="note">
+              <Info size={15} />
+              <span>
+                {salesRangeOutside
+                  ? "За выбранный период нет данных продаж: в файле есть"
+                  : "Данные продаж покрывают выбранный период частично: в файле есть"}{" "}
+                даты {dateLabel(report.minDate)} — {dateLabel(report.maxDate)}.
+                Дни за пределами выгрузки не считаются нулевыми продажами.
+              </span>
+            </div>
+          )}
         <input
           hidden
           ref={inputRef}
@@ -1171,10 +1183,12 @@ function App() {
         ) : tab === 4 ? (
           <Advertising
             report={adsReport}
+            range={{ start: filters.start, end: filters.end }}
             loading={adsLoading}
             error={adsError}
             onInfo={() => setInfo(true)}
             onUpload={() => inputRef.current.click()}
+            onReportPeriod={(range) => setFilters((f) => ({ ...f, ...range }))}
           />
         ) : (
           <>
@@ -1243,7 +1257,7 @@ function App() {
                 Экспорт CSV
               </button>
             </div>
-            {tab === 0 && (
+            {tab === 0 && !salesRangeOutside && (
               <div className="metrics-grid">
                 <Metric
                   title="Заказано на сумму"
@@ -1621,7 +1635,8 @@ function App() {
       </main>
       {hasMarketplaceData && periodOpen && (
         <DateRangePicker
-          report={report}
+          report={periodBounds}
+          hint={`Выбор действует во всех разделах. Продажи: ${dateLabel(report.minDate)} — ${dateLabel(report.maxDate)}.${adsReport ? ` Реклама: ${dateLabel(adsReport.start)} — ${dateLabel(adsReport.end)} (общий итог).` : ""}`}
           value={{ start: filters.start, end: filters.end }}
           onClose={() => setPeriodOpen(false)}
           onApply={(range) => {

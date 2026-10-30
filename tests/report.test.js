@@ -313,3 +313,56 @@ test("advertising parser rejects mismatched reporting periods", () => {
     /Периоды листов/,
   );
 });
+
+test("shared calendar includes sales and advertising source periods", async () => {
+  const { calendarBounds } = await import("../src/data/calendar.js");
+  assert.deepEqual(calendarBounds(report, adsReport), {
+    minDate: "2026-07-01",
+    maxDate: "2026-10-29",
+  });
+  assert.deepEqual(calendarBounds(report, null), {
+    minDate: report.minDate,
+    maxDate: report.maxDate,
+  });
+  assert.deepEqual(
+    calendarBounds(null, { start: "2026-05-01", end: "2026-06-01" }),
+    { minDate: "2026-05-01", maxDate: "2026-06-01" },
+  );
+});
+test("aggregate advertising cannot be sliced, prorated, or presented as zeros for another period", async () => {
+  const { adView } = await import("../src/data/advertising.js");
+  const exact = adView(adsReport, {
+    start: adsReport.start,
+    end: adsReport.end,
+  });
+  assert.ok(exact.period.available);
+  assert.ok(Math.abs(exact.total.spend - 159216.094866) < 1e-6);
+  for (const range of [
+    { start: "2026-07-01", end: "2026-07-01" },
+    { start: "2026-07-30", end: "2026-10-29" },
+    { start: "2026-06-01", end: "2026-10-31" },
+    { start: "2026-10-23", end: "2026-10-29" },
+  ]) {
+    const view = adView(adsReport, range);
+    assert.equal(view.period.available, false);
+    assert.equal(view.total, null);
+    assert.equal(view.cpc, null);
+    assert.deepEqual(view.rows, []);
+  }
+  assert.equal(
+    adView(adsReport, { start: "2026-10-23", end: "2026-10-29" }).period.reason,
+    "outside",
+  );
+});
+test("sales days outside source coverage are unknown rather than zero", () => {
+  const view = getView(report, {
+    ...all,
+    start: "2026-07-01",
+    end: report.maxDate,
+  });
+  assert.equal(view.total.amount, 8151692);
+  assert.equal(view.days[0].amount, null);
+  assert.equal(view.days[0].unavailable, true);
+  assert.equal(view.days[0].missing, true);
+  assert.equal(view.days.find((d) => d.date === "2026-07-30").amount, 0);
+});

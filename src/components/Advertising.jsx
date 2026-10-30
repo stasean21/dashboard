@@ -268,9 +268,10 @@ export function AdvertisingMethod({ report }) {
       )}
       <h3>Период рекламного отчёта</h3>
       <p>
-        Файл содержит итоги за весь указанный период, без дат в строках. Здесь
-        нельзя выделить отдельные дни или сопоставить рекламу с другим периодом
-        отчёта продаж. Период меняется при загрузке нового рекламного отчёта.
+        Выбранный период общий для всех разделов. Этот файл содержит только итог
+        за весь период, без дат в строках. Его показатели доступны только при
+        точном совпадении выбранных дат с периодом файла. Для просмотра
+        отдельных дней нужна рекламная выгрузка с дневной детализацией.
       </p>
       <h3>Показатели</h3>
       <ul>
@@ -422,10 +423,12 @@ function ProductDetail({ product, report, onClose }) {
 
 export default function Advertising({
   report,
+  range,
   loading,
   error,
   onInfo,
   onUpload,
+  onReportPeriod,
 }) {
   const [tab, setTab] = useState("overview"),
     [tool, setTool] = useState("all"),
@@ -435,6 +438,7 @@ export default function Advertising({
     [sort, setSort] = useState({ key: "spend", dir: "desc" }),
     [sku, setSku] = useState(null);
   const deferredQuery = useDeferredValue(query);
+  useEffect(() => setSku(null), [range?.start, range?.end]);
   useEffect(() => {
     setTool("all");
     setCampaign("all");
@@ -443,8 +447,10 @@ export default function Advertising({
   }, [report]);
   const view = useMemo(
     () =>
-      report ? adView(report, { tool, campaign, query: deferredQuery }) : null,
-    [report, tool, campaign, deferredQuery],
+      report
+        ? adView(report, { tool, campaign, query: deferredQuery, ...range })
+        : null,
+    [report, tool, campaign, deferredQuery, range?.start, range?.end],
   );
   const allCampaigns = useMemo(
     () =>
@@ -478,6 +484,61 @@ export default function Advertising({
           <button className="button" onClick={onUpload}>
             Загрузить Excel
           </button>
+        </div>
+      </Card>
+    );
+  if (!view.period.available)
+    return (
+      <Card className="ad-period-unavailable">
+        <div className="empty">
+          <Info size={28} />
+          <h2>
+            {view.period.reason === "outside"
+              ? "За выбранный период нет рекламных данных"
+              : "В файле нет разбивки по дням"}
+          </h2>
+          <p>
+            Выбрано:{" "}
+            {dateLabel(view.period.start, { day: "2-digit", month: "2-digit" })}{" "}
+            —{" "}
+            {dateLabel(view.period.end, {
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+            })}
+            .
+          </p>
+          <p className="ad-source-period">
+            Выгрузка рекламы:{" "}
+            {dateLabel(report.start, { day: "2-digit", month: "2-digit" })} —{" "}
+            {dateLabel(report.end, {
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+            })}
+            .
+          </p>
+          <p>
+            В этом Excel есть только общий итог. Для выбранных дат нужен отчёт
+            за тот же период, а для просмотра по дням — выгрузка с дневной
+            детализацией.
+          </p>
+          <div className="ad-period-actions">
+            <button
+              className="button primary"
+              onClick={() =>
+                onReportPeriod({ start: report.start, end: report.end })
+              }
+            >
+              Показать весь рекламный отчёт
+            </button>
+            <button className="button" onClick={onUpload}>
+              Загрузить Excel
+            </button>
+          </div>
+          <p className="fineprint">
+            Выбранные даты будут одинаковыми во всех разделах.
+          </p>
         </div>
       </Card>
     );
@@ -532,7 +593,7 @@ export default function Advertising({
           r.modelSales,
         ]),
       ],
-      `formula_ads_${report.start}_${report.end}_${tab}.csv`,
+      `formula_ads_${view.period.start}_${view.period.end}_${tab}.csv`,
     );
   }
   const sortedCampaigns = sortRows(view.campaigns, {
@@ -563,9 +624,16 @@ export default function Advertising({
             </button>
           ))}
         </nav>
-        <span className="ad-period-note">
+        <span className="ad-period-note ad-report-period">
           <Info size={13} />
-          Итоги за период · без дневной разбивки
+          Выгрузка:{" "}
+          {dateLabel(report.start, { day: "2-digit", month: "2-digit" })} —{" "}
+          {dateLabel(report.end, {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+          })}{" "}
+          · без дневной разбивки
         </span>
       </div>
       <div className="ad-filter-bar">
@@ -682,7 +750,7 @@ export default function Advertising({
                   <p>
                     {metric === "drr"
                       ? "Расход / продажи · без усреднения процентов"
-                      : "Сравнение за весь период отчёта"}
+                      : "Сравнение за выбранный период"}
                   </p>
                 </div>
                 <span className="chip">
