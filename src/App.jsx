@@ -3,7 +3,6 @@ import {
   AreaChart,
   Area,
   ComposedChart,
-  Line,
   Bar,
   XAxis,
   YAxis,
@@ -19,8 +18,6 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   CalendarDays,
   SlidersHorizontal,
   Box,
@@ -32,6 +29,8 @@ import {
   RotateCcw,
   FileSpreadsheet,
   AlertCircle,
+  TriangleAlert,
+  ChartNoAxesColumn,
   CircleHelp,
 } from "lucide-react";
 import { gunzipSync, strFromU8 } from "fflate";
@@ -55,6 +54,8 @@ import {
   chartBuckets,
 } from "./data/metrics.js";
 
+import InfiniteList, { useInfiniteList } from "./components/InfiniteList.jsx";
+import { PanelTitle, StatCard } from "./components/DashboardUI.jsx";
 import Select from "./components/Select.jsx";
 import Dialog from "./components/Dialog.jsx";
 import Advertising, { AdvertisingMethod } from "./components/Advertising.jsx";
@@ -253,12 +254,15 @@ function Chart({
             ["cancelled", "returned"]
               .filter((k) => outcome === "all" || outcome === k)
               .map((k) =>
-                dense ? (
-                  <Line
+                !useBars ? (
+                  <Area
                     key={k}
                     type="bumpX"
                     dataKey={k}
                     stroke={k === "cancelled" ? "#ff7839" : "#343b52"}
+                    fill={
+                      k === "cancelled" ? "url(#orangeFill)" : "transparent"
+                    }
                     strokeWidth={2.5}
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -314,7 +318,7 @@ function Chart({
     </div>
   );
 }
-function Gauge({ value, bought, orders }) {
+function Gauge({ value, bought, orders, modern = false }) {
   const safe = Math.max(0, Math.min(100, value));
   const angle = Math.PI - (safe / 100) * Math.PI;
   const ux = Math.cos(angle),
@@ -333,27 +337,31 @@ function Gauge({ value, bought, orders }) {
           pathLength="100"
           fill="none"
           stroke="var(--track)"
-          strokeWidth="19"
+          strokeWidth={modern ? "23" : "19"}
         />
         <path
           d="M 22 125 A 108 108 0 0 1 238 125"
           pathLength="100"
           fill="none"
           stroke="#ff7734"
-          strokeWidth="19"
+          strokeWidth={modern ? "23" : "19"}
           strokeDasharray={`${safe} 100`}
         />
-        <path
-          d={`M ${130 - uy * 5} ${125 + ux * 5} L ${px} ${py} L ${130 + uy * 5} ${125 - ux * 5} Z`}
-          fill="#283148"
-        />
-        <circle cx="130" cy="125" r="6" fill="#283148" />
-        <text x="14" y="155">
-          0%
-        </text>
-        <text x="216" y="155">
-          100%
-        </text>
+        {!modern && (
+          <>
+            <path
+              d={`M ${130 - uy * 5} ${125 + ux * 5} L ${px} ${py} L ${130 + uy * 5} ${125 - ux * 5} Z`}
+              fill="#283148"
+            />
+            <circle cx="130" cy="125" r="6" fill="#283148" />
+            <text x="14" y="155">
+              0%
+            </text>
+            <text x="216" y="155">
+              100%
+            </text>
+          </>
+        )}
       </svg>
       <strong>{orders ? percent(value) : "—"}</strong>
       <p>
@@ -528,8 +536,6 @@ function ProductTable({
   onMetricChange,
   renderPhoto,
 }) {
-  const [page, setPage] = useState(0);
-  useEffect(() => setPage(0), [products, sort]);
   const sorted = useMemo(
     () =>
       [...products].sort((a, b) => {
@@ -542,10 +548,8 @@ function ProductTable({
       }),
     [products, sort],
   );
-  const limit = compact ? 4 : 12,
-    maxPage = Math.max(0, Math.ceil(sorted.length / limit) - 1);
-  const currentPage = Math.min(page, maxPage),
-    visible = sorted.slice(currentPage * limit, (currentPage + 1) * limit);
+  const scrolling = useInfiniteList(sorted, 12);
+  const visible = compact ? sorted.slice(0, 4) : scrolling.visible;
   const contextKey = metric === "orders" ? "amount" : "orders";
   const cols = [
     { key: "name", label: "Товар" },
@@ -677,38 +681,213 @@ function ProductTable({
             </table>
           </div>
           {!compact && (
-            <div className="pagination">
-              <span>
-                {currentPage * limit + 1}–
-                {Math.min((currentPage + 1) * limit, products.length)} из{" "}
-                {fmt(products.length)} товаров
-              </span>
-              <div className="inline">
-                <button
-                  aria-label="Предыдущая страница"
-                  className="icon-button"
-                  disabled={currentPage === 0}
-                  onClick={() => setPage(currentPage - 1)}
-                >
-                  <ChevronLeft size={17} />
-                </button>
-                <span>
-                  {currentPage + 1} / {maxPage + 1}
-                </span>
-                <button
-                  aria-label="Следующая страница"
-                  className="icon-button"
-                  disabled={currentPage >= maxPage}
-                  onClick={() => setPage(currentPage + 1)}
-                >
-                  <ChevronRight size={17} />
-                </button>
-              </div>
-            </div>
+            <InfiniteList
+              shown={visible.length}
+              total={sorted.length}
+              more={scrolling.more}
+              onLoad={scrolling.load}
+            />
           )}
         </>
       )}
     </Card>
+  );
+}
+function GrowthList({ products, onProduct, renderPhoto }) {
+  const rows = useMemo(
+    () =>
+      products
+        .filter((p) => p.visits >= 100 && p.orders === 0)
+        .sort((a, b) => b.visits - a.visits),
+    [products],
+  );
+  const { visible, more, load } = useInfiniteList(rows, 5);
+  return (
+    <Card className="growth-list">
+      <PanelTitle
+        icon={TriangleAlert}
+        label="Точки роста"
+        title="Есть посещения, но нет заказанных товаров"
+      />
+      <span className="chip">{rows.length} SKU · от 100 посещений</span>
+      {!rows.length ? (
+        <Empty text="В выбранном периоде таких товаров нет" />
+      ) : (
+        <>
+          <div className="table-scroll">
+            <table className="dashboard-list growth-table">
+              <colgroup>
+                {[48, 13, 13, 11, 15].map((w, i) => (
+                  <col key={i} style={{ width: `${w}%` }} />
+                ))}
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>Товар</th>
+                  <th>Посещения</th>
+                  <th>В корзину</th>
+                  <th>Заказано</th>
+                  <th>Внимание</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((p) => (
+                  <tr key={p.sku}>
+                    <td>
+                      <ListProduct
+                        name={shortName(p.name)}
+                        sku={p.sku}
+                        article={p.article}
+                        photo={renderPhoto(p.sku)}
+                        onOpen={() => onProduct(p.sku)}
+                      />
+                    </td>
+                    <td>{fmt(p.visits)}</td>
+                    <td>{fmt(p.cart)}</td>
+                    <td>{fmt(p.orders)}</td>
+                    <td>
+                      <button
+                        className="status-action"
+                        onClick={() => onProduct(p.sku)}
+                      >
+                        Проверить карточку
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <InfiniteList
+            shown={visible.length}
+            total={rows.length}
+            more={more}
+            onLoad={load}
+          />
+        </>
+      )}
+    </Card>
+  );
+}
+function FunnelPage({ view, onProduct, renderPhoto }) {
+  const [group, setGroup] = useState("week"),
+    [metric, setMetric] = useState("cart");
+  const t = view.total;
+  return (
+    <div className="funnel-redesign">
+      <div className="page-stat-grid">
+        {[
+          ["impressions", "Показы всего", Eye, "На всех страницах Ozon"],
+          ["visits", "Посещения карточек", MousePointer2, "Переходы к товарам"],
+          [
+            "cart",
+            "Добавления в корзину",
+            ShoppingCart,
+            "Из поиска и карточек",
+          ],
+          ["orders", "Заказано товаров", Box, "Количество единиц товара"],
+        ].map(([key, title, Icon, note]) => (
+          <StatCard
+            key={key}
+            title={title}
+            value={fmt(t[key])}
+            note={note}
+            icon={Icon}
+            accent={key === metric}
+            onClick={() => setMetric(key)}
+            active={key === metric}
+          />
+        ))}
+      </div>
+      <div className="funnel-dashboard-grid">
+        <Card className="funnel-dynamics">
+          <PanelTitle
+            icon={ChartNoAxesColumn}
+            label="Активность покупателей"
+            title="Динамика воронки"
+          />
+          <div className="chart-controls">
+            <div className="segmented">
+              {[
+                ["day", "Дни"],
+                ["week", "Недели"],
+                ["month", "Месяцы"],
+              ].map(([key, label]) => (
+                <button
+                  key={key}
+                  className={group === key ? "selected" : ""}
+                  onClick={() => setGroup(key)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <Select
+              label="Этап воронки"
+              value={metric}
+              onChange={setMetric}
+              options={[
+                ["impressions", "Показы"],
+                ["visits", "Посещения"],
+                ["cart", "Корзина"],
+                ["orders", "Заказы"],
+                ["amount", "Сумма заказов"],
+              ].map(([value, label]) => ({ value, label }))}
+            />
+          </div>
+          <Chart
+            days={view.days}
+            metric={metric}
+            group={group}
+            height={310}
+            type="bar"
+          />
+          <p className="method-note">
+            По выбранным датам · неполные недели и месяцы учтены
+          </p>
+        </Card>
+        <Card className="conversion-panel">
+          <PanelTitle
+            icon={MousePointer2}
+            label="Показатели карточек"
+            title="Конверсии и выкуп"
+          />
+          {[
+            [
+              "Корзина к посещениям",
+              "Добавления в корзину / посещения карточек",
+              ratio(t.cart, t.visits),
+            ],
+            [
+              "Заказы к корзине",
+              "Заказанные товары / добавления в корзину",
+              ratio(t.orders, t.cart),
+            ],
+            [
+              "Выкуп от заказанных",
+              "По строкам выбранного периода",
+              ratio(t.bought, t.orders),
+            ],
+          ].map(([title, note, value]) => (
+            <div className="conversion-row" key={title}>
+              <div>
+                <h3>{title}</h3>
+                <p>{note}</p>
+              </div>
+              <strong>{percent(value)}</strong>
+            </div>
+          ))}
+        </Card>
+      </div>
+      <GrowthList
+        products={view.products}
+        onProduct={onProduct}
+        renderPhoto={renderPhoto}
+      />
+      <p className="method-note">
+        Показатели событий не являются путём уникального покупателя.
+      </p>
+    </div>
   );
 }
 function App() {
@@ -727,7 +906,6 @@ function App() {
   const [filters, setFilters] = useState({ start: "", end: "", ...defaults });
   const [tab, setTab] = useState(0),
     [periodOpen, setPeriodOpen] = useState(false);
-  const [funnelMetric, setFunnelMetric] = useState("impressions");
   const [metric, setMetric] = useState("amount"),
     [group, setGroup] = useState("auto"),
     [chartType, setChartType] = useState("area");
@@ -1290,6 +1468,7 @@ function App() {
             mode={catalogMode}
             filter={catalogFilter}
             onFilter={setCatalogFilter}
+            onChecks={openCatalogChecks}
             marketplace={marketplace}
             state={catalogStore.state}
             photoRevision={catalogStore.photoRevision}
@@ -1315,11 +1494,12 @@ function App() {
             onUpload={() => inputRef.current.click()}
             onReportPeriod={(range) => setFilters((f) => ({ ...f, ...range }))}
             renderPhoto={renderCatalogPhoto}
+            salesReport={report}
           />
         ) : (
           <>
             <div className="filter-bar">
-              <div className="search-field">
+              <div className="search-field dashboard-search">
                 <Search size={17} />
                 <input
                   aria-label="Поиск товаров"
@@ -1336,6 +1516,13 @@ function App() {
                     <X size={15} />
                   </button>
                 )}
+                <button
+                  className="search-submit"
+                  type="button"
+                  onClick={() => document.activeElement?.blur()}
+                >
+                  Найти
+                </button>
               </div>
               <div className="filters">
                 <SlidersHorizontal size={15} />
@@ -1438,6 +1625,29 @@ function App() {
               </Card>
             ) : (
               <>
+                {tab === 3 && (
+                  <div className="page-stat-grid three">
+                    <StatCard
+                      title="Отменено товаров"
+                      value={`${fmt(total.cancelled)} шт.`}
+                      note={`${percent(ratio(total.cancelled, total.orders))} от заказанных`}
+                      icon={TriangleAlert}
+                      accent
+                    />
+                    <StatCard
+                      title="Возвращено товаров"
+                      value={`${fmt(total.returned)} шт.`}
+                      note={`${percent(ratio(total.returned, total.orders))} от заказанных`}
+                      icon={RotateCcw}
+                    />
+                    <StatCard
+                      title="Товаров со статусами"
+                      value={`${qualityProducts.length} SKU`}
+                      note="С отменами или возвратами"
+                      icon={Box}
+                    />
+                  </div>
+                )}
                 {(tab === 0 || tab === 3) && (
                   <div
                     className={`overview-grid ${tab === 3 ? "quality-grid" : ""}`}
@@ -1565,28 +1775,6 @@ function App() {
                               </button>
                             ))}
                           </div>
-                          <div className="quality-summary">
-                            <div>
-                              <span>Отменено за период</span>
-                              <strong>
-                                {fmt(total.cancelled)} <small>шт.</small>
-                              </strong>
-                              <em>
-                                {percent(ratio(total.cancelled, total.orders))}{" "}
-                                от заказанных
-                              </em>
-                            </div>
-                            <div>
-                              <span>Возвращено за период</span>
-                              <strong>
-                                {fmt(total.returned)} <small>шт.</small>
-                              </strong>
-                              <em>
-                                {percent(ratio(total.returned, total.orders))}{" "}
-                                от заказанных
-                              </em>
-                            </div>
-                          </div>
                           <div className="legend">
                             <span>
                               <i style={{ background: "#ff7839" }} />
@@ -1605,7 +1793,7 @@ function App() {
                         group={effectiveGroup}
                         outcome={outcome}
                         quality={tab === 3}
-                        type={tab === 3 ? "bar" : chartType}
+                        type={tab === 3 ? "area" : chartType}
                         height={tab === 3 ? 250 : 230}
                       />
                       <div className="chart-bottom">
@@ -1631,7 +1819,9 @@ function App() {
                         )}
                       </div>
                     </Card>
-                    <Card className="gauge-card">
+                    <Card
+                      className={`gauge-card ${tab === 3 ? "dark-panel quality-buyout" : ""}`}
+                    >
                       <div className="card-heading">
                         <h2>Процент выкупа</h2>
                         <span title="Выкуплено / заказано × 100%">
@@ -1639,13 +1829,13 @@ function App() {
                         </span>
                       </div>
                       <Gauge
+                        modern={tab === 3}
                         value={buyout}
                         bought={total.bought}
                         orders={total.orders}
                       />
                       <p className="gauge-caption">
-                        Доля товаров, которые не отменили
-                        <br />и не вернули после заказа
+                        Выкуплено от заказанных товаров
                       </p>
                     </Card>
                     {tab === 0 ? (
@@ -1662,9 +1852,7 @@ function App() {
                         </div>
                         <Funnel total={total} />
                       </Card>
-                    ) : (
-                      <Insights view={view} />
-                    )}
+                    ) : null}
                   </div>
                 )}
                 {tab === 0 && (
@@ -1697,46 +1885,11 @@ function App() {
                   />
                 )}
                 {tab === 2 && (
-                  <div className="funnel-page">
-                    <Card>
-                      <div className="card-heading">
-                        <h2>От показа к заказу</h2>
-                        <span className="chip">
-                          {fmt(view.products.length)} SKU
-                        </span>
-                      </div>
-                      <Funnel total={total} expanded />
-                      <p className="method-note">
-                        <Info size={16} />
-                        Отношения рассчитаны из суммарных событий выбранного
-                        периода. Это не путь уникального покупателя: заказ может
-                        прийти из другого канала, поэтому отношения могут
-                        превышать 100%.
-                      </p>
-                    </Card>
-                    <Card className="funnel-dynamics">
-                      <div className="card-heading">
-                        <h2>Динамика воронки</h2>
-                        <Select
-                          label="Этап воронки"
-                          value={funnelMetric}
-                          onChange={setFunnelMetric}
-                          options={[
-                            { value: "impressions", label: "Показы" },
-                            { value: "visits", label: "Посещения" },
-                            { value: "cart", label: "Корзина" },
-                            { value: "orders", label: "Заказы" },
-                            { value: "amount", label: "Сумма заказов" },
-                          ]}
-                        />
-                      </div>
-                      <Chart
-                        days={view.days}
-                        metric={funnelMetric}
-                        height={345}
-                      />
-                    </Card>
-                  </div>
+                  <FunnelPage
+                    view={view}
+                    onProduct={setProductSku}
+                    renderPhoto={renderCatalogPhoto}
+                  />
                 )}
                 {tab === 3 && (
                   <ProductTable

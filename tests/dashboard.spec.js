@@ -35,8 +35,9 @@ test("real report loads, product drilldown and date filters recalculate actual t
   await page.getByRole("button", { name: "Воронка", exact: true }).click();
   await page.getByRole("combobox", { name: "Этап воронки" }).click();
   await page.getByRole("option", { name: "Корзина", exact: true }).click();
-  await expect(page.locator(".funnel.expanded")).toContainText(
-    "Добавления в корзину",
+  await expect(page.locator(".funnel-dynamics .chart")).toHaveAttribute(
+    "data-metric",
+    "cart",
   );
   await page.getByRole("button", { name: "Качество", exact: true }).click();
   await expect(
@@ -44,15 +45,18 @@ test("real report loads, product drilldown and date filters recalculate actual t
   ).toBeVisible();
   expect(errors).toEqual([]);
 });
-test("search, ABC, sorting, pagination and CSV work", async ({ page }) => {
+test("search, ABC, sorting, infinite scrolling and CSV work", async ({
+  page,
+}) => {
   await ready(page);
   await page.getByRole("button", { name: "Товары", exact: true }).click();
   await page
     .getByRole("button", { name: "Аналитика Ozon", exact: true })
     .click();
   await expect(page.locator("tbody tr")).toHaveCount(12);
-  await page.getByRole("button", { name: "Следующая страница" }).click();
-  await expect(page.locator(".pagination")).toContainText("13–24");
+  await page.locator(".infinite-list-status").scrollIntoViewIfNeeded();
+  await expect(page.locator("tbody tr")).toHaveCount(24);
+  await expect(page.locator(".pagination")).toHaveCount(0);
   await page.getByLabel("Поиск товаров").fill("5330035142");
   await expect(page.locator("tbody tr")).toHaveCount(1);
   await expect(
@@ -81,6 +85,7 @@ test("search, ABC, sorting, pagination and CSV work", async ({ page }) => {
 test("Excel upload runs in worker and replaces report; refresh restores original", async ({
   page,
 }) => {
+  await page.clock.setFixedTime(new Date("2026-10-30T09:00:00Z"));
   await ready(page);
   const cell = (c, r, v) =>
     `<c r="${c}${r}" t="inlineStr"><is><t>${v}</t></is></c>`;
@@ -215,7 +220,7 @@ test("quality long-range chart has useful buckets and status-linked tables; dail
   await ready(page);
   await page.getByLabel("Поиск товаров").fill("5330035142");
   await page.getByRole("button", { name: "Качество", exact: true }).click();
-  await expect(page.locator(".quality-summary")).toContainText("39");
+  await expect(page.locator(".page-stat-grid")).toContainText("39");
   await expect(page.locator(".trend-card .chart")).toHaveAttribute(
     "data-buckets",
     "14",
@@ -231,10 +236,10 @@ test("quality long-range chart has useful buckets and status-linked tables; dail
     .allTextContents();
   expect(new Set(ticks).size).toBe(ticks.length);
   await page.getByRole("button", { name: "Дни", exact: true }).click();
-  await expect(page.locator(".trend-card .recharts-line")).toHaveCount(2);
+  await expect(page.locator(".trend-card .recharts-area")).toHaveCount(2);
   await expect(page.locator(".chart-dense-note")).toBeVisible();
   await page.getByRole("button", { name: "Возвраты", exact: true }).click();
-  await expect(page.locator(".trend-card .recharts-line")).toHaveCount(1);
+  await expect(page.locator(".trend-card .recharts-area")).toHaveCount(1);
   await expect(page.locator(".trend-card .chart")).toHaveAttribute(
     "data-metric",
     "returned",
@@ -268,7 +273,7 @@ test("chart lines have rounded cubic bends in daily and weekly modes", async ({
   }
   await page.getByRole("button", { name: "Качество", exact: true }).click();
   await page.getByRole("button", { name: "Дни", exact: true }).click();
-  const lines = page.locator(".trend-card .recharts-line-curve");
+  const lines = page.locator(".trend-card .recharts-area-curve");
   await expect(lines).toHaveCount(2);
   for (const line of await lines.all())
     await expect(line).toHaveAttribute("d", /C/);

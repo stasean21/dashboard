@@ -41,6 +41,7 @@ export function groupAdProducts(rows) {
   return [...map].map(([sku, rr]) => ({
     sku,
     name: rr[0].name,
+    article: rr[0].article || "",
     detail: rr,
     ...adTotals(rr),
   }));
@@ -102,7 +103,9 @@ export function adView(
       (campaign === "all" || r.campaign === campaign) &&
       (!needle ||
         (r.sku !== "0" &&
-          `${r.name} ${r.sku}`.toLocaleLowerCase("ru").includes(needle))),
+          `${r.name} ${r.sku} ${r.article || ""}`
+            .toLocaleLowerCase("ru")
+            .includes(needle))),
   );
   const products = groupAdProducts(rows),
     cpc = adTotals(rows.filter((r) => r.toolKey === "cpc"));

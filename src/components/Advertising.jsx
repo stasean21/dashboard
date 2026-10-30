@@ -4,14 +4,27 @@ import {
   ArrowUpRight,
   ArrowUpDown,
   Box,
-  ChevronLeft,
-  ChevronRight,
+  ChartNoAxesColumn,
+  BadgeRussianRuble,
+  MousePointer2,
+  Package,
   Download,
   Info,
   RotateCcw,
   Search,
   X,
 } from "lucide-react";
+import InfiniteList, { useInfiniteList } from "./InfiniteList.jsx";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Cell,
+} from "recharts";
 import Select from "./Select.jsx";
 import Dialog from "./Dialog.jsx";
 import ListProduct from "./ListProduct.jsx";
@@ -94,13 +107,8 @@ function AdTable({
   onAll,
   renderPhoto,
 }) {
-  const [page, setPage] = useState(0);
-  useEffect(() => setPage(0), [rows, sort]);
   const sorted = useMemo(() => sortRows(rows, sort), [rows, sort]);
-  const limit = compact ? 5 : 12,
-    maxPage = Math.max(0, Math.ceil(rows.length / limit) - 1),
-    current = Math.min(page, maxPage),
-    visible = sorted.slice(current * limit, (current + 1) * limit);
+  const { visible, more, load } = useInfiniteList(sorted, 12);
   const columns = [
     ["spend", "Расход, ₽"],
     ["sales", "Продажи, ₽"],
@@ -201,6 +209,7 @@ function AdTable({
                         <ListProduct
                           name={shortName(row.name)}
                           sku={row.sku}
+                          article={row.article}
                           onOpen={() => onRow(row)}
                           photo={
                             renderPhoto ? (
@@ -227,35 +236,12 @@ function AdTable({
               </tbody>
             </table>
           </div>
-          {!compact && (
-            <div className="pagination">
-              <span>
-                {current * limit + 1}–
-                {Math.min((current + 1) * limit, rows.length)} из {rows.length}
-              </span>
-              <div className="inline">
-                <button
-                  className="icon-button"
-                  aria-label="Предыдущая страница"
-                  disabled={current === 0}
-                  onClick={() => setPage(current - 1)}
-                >
-                  <ChevronLeft size={17} />
-                </button>
-                <span>
-                  {current + 1} / {maxPage + 1}
-                </span>
-                <button
-                  className="icon-button"
-                  aria-label="Следующая страница"
-                  disabled={current === maxPage}
-                  onClick={() => setPage(current + 1)}
-                >
-                  <ChevronRight size={17} />
-                </button>
-              </div>
-            </div>
-          )}
+          <InfiniteList
+            shown={visible.length}
+            total={sorted.length}
+            more={more}
+            onLoad={load}
+          />
         </>
       )}
     </Card>
@@ -457,6 +443,7 @@ export default function Advertising({
   onUpload,
   onReportPeriod,
   renderPhoto,
+  salesReport,
 }) {
   const [tab, setTab] = useState("overview"),
     [tool, setTool] = useState("all"),
@@ -473,12 +460,30 @@ export default function Advertising({
     setQuery("");
     setSku(null);
   }, [report]);
+  const linkedReport = useMemo(() => {
+    if (!report) return null;
+    const articles = new Map(
+      salesReport?.rows.map((r) => [r.sku, r.article]) || [],
+    );
+    return {
+      ...report,
+      rows: report.rows.map((r) => ({
+        ...r,
+        article: articles.get(r.sku) || "",
+      })),
+    };
+  }, [report, salesReport]);
   const view = useMemo(
     () =>
       report
-        ? adView(report, { tool, campaign, query: deferredQuery, ...range })
+        ? adView(linkedReport, {
+            tool,
+            campaign,
+            query: deferredQuery,
+            ...range,
+          })
         : null,
-    [report, tool, campaign, deferredQuery, range?.start, range?.end],
+    [linkedReport, tool, campaign, deferredQuery, range?.start, range?.end],
   );
   const allCampaigns = useMemo(
     () =>
@@ -603,6 +608,7 @@ export default function Advertising({
         [
           "Название",
           "SKU / ID кампании",
+          "Артикул продавца",
           "Расход, ₽",
           "Продажи, ₽",
           "ДРР, %",
@@ -613,6 +619,7 @@ export default function Advertising({
         ...sorted.map((r) => [
           r.name,
           tab === "campaigns" ? r.id : r.sku,
+          r.article || "",
           r.spend,
           r.sales,
           adValue(r, "drr") ?? "",
@@ -633,7 +640,6 @@ export default function Advertising({
     const rest = sortedCampaigns.slice(4);
     budget.push({ name: "Остальные кампании", id: null, ...adTotals(rest) });
   }
-  const budgetMax = Math.max(1, ...budget.map((r) => adValue(r, metric) || 0));
   return (
     <div className="advertising">
       <div className="ad-toolbar">
@@ -700,7 +706,7 @@ export default function Advertising({
           <Search size={16} />
           <input
             aria-label="Поиск рекламных товаров"
-            placeholder="Название или SKU"
+            placeholder="Название, артикул или SKU"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -713,6 +719,13 @@ export default function Advertising({
               <X size={14} />
             </button>
           )}
+          <button
+            className="search-submit"
+            type="button"
+            onClick={() => document.activeElement?.blur()}
+          >
+            Найти
+          </button>
         </div>
         <button
           className="text-button"
@@ -733,7 +746,20 @@ export default function Advertising({
             aria-pressed={metric === key}
             onClick={() => selectMetric(key)}
           >
-            <span>{title}</span>
+            <span>
+              {title}
+              <span className="dashboard-icon">
+                {key === "spend" ? (
+                  <BadgeRussianRuble size={21} />
+                ) : key === "sales" ? (
+                  <ChartNoAxesColumn size={21} />
+                ) : key === "drr" ? (
+                  <MousePointer2 size={21} />
+                ) : (
+                  <Package size={21} />
+                )}
+              </span>
+            </span>
             <strong>
               {format(key, adValue(total, key))}
               {key === "units" && <small> шт.</small>}
@@ -790,39 +816,69 @@ export default function Advertising({
                   кампаний CPC
                 </span>
               </div>
-              {budget.map((c, i) => {
-                const value = adValue(c, metric);
-                const width =
-                  metric === "drr"
-                    ? ratio(value || 0, budgetMax)
-                    : ratio(value || 0, adValue(total, metric));
-                return (
-                  <button
-                    className="ad-budget-row"
-                    key={c.id ?? "others"}
-                    disabled={c.id == null}
-                    onClick={() => drillCampaign(c)}
+              <div
+                className="ad-budget-chart"
+                role="img"
+                aria-label="Сравнение рекламных кампаний"
+              >
+                <ResponsiveContainer width="100%" height={290}>
+                  <BarChart
+                    data={budget}
+                    margin={{ top: 24, right: 10, left: 10, bottom: 10 }}
                   >
-                    <span className="ad-budget-meta">
-                      <span>{c.name}</span>
-                      <strong>
-                        {format(metric, value)}
-                        {metric !== "drr" && <small> · {percent(width)}</small>}
-                      </strong>
-                    </span>
-                    <span className="ad-track">
-                      <span
-                        style={{
-                          width: `${Math.min(100, width)}%`,
-                          background: i === 0 ? "#ff792f" : "#ffa475",
-                        }}
-                      />
-                    </span>
-                  </button>
-                );
-              })}
+                    <CartesianGrid
+                      vertical={false}
+                      strokeDasharray="3 6"
+                      stroke="#e9eaf1"
+                    />
+                    <XAxis
+                      dataKey="name"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: "#30333e", fontSize: 12 }}
+                      tickFormatter={(v) =>
+                        v
+                          .replace("Кампания ", "")
+                          .replace("Остальные кампании", "Остальные")
+                      }
+                      interval={0}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: "#30333e", fontSize: 12 }}
+                      tickFormatter={(v) =>
+                        metric === "drr"
+                          ? `${fmt(v)}%`
+                          : Math.abs(v) >= 1000
+                            ? `${fmt(v / 1000)} тыс.`
+                            : fmt(v)
+                      }
+                    />
+                    <Tooltip
+                      cursor={{ fill: "#f5f3f9" }}
+                      formatter={(v) => format(metric, v)}
+                    />
+                    <Bar
+                      dataKey={(c) => adValue(c, metric)}
+                      radius={[28, 28, 28, 28]}
+                      maxBarSize={70}
+                      background={{ fill: "#f4f2f8", radius: 28 }}
+                      isAnimationActive={false}
+                      onClick={(c) => c.id != null && drillCampaign(c)}
+                    >
+                      {budget.map((c, i) => (
+                        <Cell
+                          key={c.id ?? "others"}
+                          fill={i === 0 ? "#ff9958" : "#69728b"}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </Card>
-            <Card>
+            <Card className="ad-tools-detail">
               <div className="card-heading">
                 <h2>Рекламные инструменты</h2>
               </div>
@@ -849,9 +905,9 @@ export default function Advertising({
                 <strong>{money(total.spend - cpc.spend)}</strong>
               </div>
             </Card>
-            <Card>
+            <Card className="dark-panel ad-efficiency-panel">
               <div className="card-heading">
-                <h2>Отдача продвижения</h2>
+                <h2>Результат продвижения</h2>
                 <button
                   className="icon-button"
                   aria-label="Как считаются рекламные показатели"
@@ -860,18 +916,26 @@ export default function Advertising({
                   <Info size={15} />
                 </button>
               </div>
-              <span className="ad-secondary-label">Продажи на 1 ₽ расхода</span>
+
               <div className="ad-roas">
                 {total.spend ? fmt(total.sales / total.spend, 2) : "—"}{" "}
-                <span>×</span>
+                <span>₽</span>
               </div>
-              <p className="fineprint">ROAS по рекламируемым товарам</p>
+              <p className="ad-roas-meaning">
+                прямых продаж на каждый
+                <br />1 ₽ расходов
+              </p>
+              <p className="fineprint">
+                По данным рекламного отчёта.
+                <br />
+                Это сумма продаж, а не прибыль.
+              </p>
               <div className="ad-efficiency">
                 <div>
                   <strong>
                     {cpc.clicks ? money2(cpc.spend / cpc.clicks) : "—"}
                   </strong>
-                  <span>Средний CPC</span>
+                  <span>Цена одного клика · CPC</span>
                 </div>
                 <div>
                   <strong>
@@ -879,12 +943,11 @@ export default function Advertising({
                       ? percent(ratio(cpc.clicks, cpc.impressions))
                       : "—"}
                   </strong>
-                  <span>CTR</span>
+                  <span>Клики / показы · CTR</span>
                 </div>
               </div>
               <p className="fineprint">
-                CPC и CTR — по инструменту «Оплата за клик». ROAS не является
-                прибылью.
+                CPC и CTR — по инструменту «Оплата за клик».
               </p>
             </Card>
           </div>
@@ -892,13 +955,12 @@ export default function Advertising({
             <AdTable
               renderPhoto={renderPhoto}
               rows={products}
-              compact
               sort={sort}
               onSort={onSort}
               onRow={(r) => setSku(r.sku)}
               onAll={() => setTab("products")}
             />
-            <Card>
+            <Card className="ad-attention-summary">
               <div className="card-heading">
                 <h2>На что обратить внимание</h2>
                 <button

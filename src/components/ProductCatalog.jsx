@@ -1,14 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ArrowUpRight,
   Check,
-  ChevronLeft,
-  ChevronRight,
   Image,
   Info,
   Search,
+  TriangleAlert,
+  Link2,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import { rowsForMarket } from "../data/catalog.js";
+import InfiniteList, { useInfiniteList } from "./InfiniteList.jsx";
 import ProductPhoto from "./ProductPhoto.jsx";
 import CopyValue from "./CopyValue.jsx";
 import { CheckBadge, CheckMark, checkCount } from "./CatalogChecks.jsx";
@@ -68,10 +71,10 @@ export default function ProductCatalog({
   onOpen,
   onCheck,
   onUpload,
+  onChecks,
 }) {
   const [query, setQuery] = useState(""),
-    [page, setPage] = useState(0);
-  useEffect(() => setPage(0), [query, mode, filter, marketplace, catalog]);
+    [layout, setLayout] = useState("cards");
   const active = checks.filter((i) => !i.resolved),
     done = checks.filter((i) => i.resolved),
     needle = query.trim().toLocaleLowerCase("ru");
@@ -100,10 +103,7 @@ export default function ProductCatalog({
           ),
     [catalog, checks, mode, filter, marketplace, needle],
   );
-  const limit = 12,
-    max = Math.max(0, Math.ceil(rows.length / limit) - 1),
-    current = Math.min(page, max),
-    visible = rows.slice(current * limit, (current + 1) * limit);
+  const { visible, more, load } = useInfiniteList(rows, 6);
   return (
     <div className="catalog-page">
       <div className="catalog-toolbar">
@@ -119,6 +119,13 @@ export default function ProductCatalog({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
+          <button
+            type="button"
+            className="search-submit"
+            onClick={() => document.activeElement?.blur()}
+          >
+            Найти
+          </button>
         </label>
       </div>
       {mode === "checks" && (
@@ -168,257 +175,406 @@ export default function ProductCatalog({
           </button>
         </p>
       )}
-      <section className="card catalog-card">
-        <div className="card-heading">
-          <div>
-            <h2>
-              {mode === "checks" ? "Проверка каталога" : "Карточки из выгрузок"}
-            </h2>
-            <p>
-              {mode === "checks"
-                ? "Проверки связей и статусы карточек WB"
-                : "Общие карточки и предложения по сопоставлению"}
-            </p>
-          </div>
-          <span className="catalog-checked-count">
-            Проверено: {done.length}
-          </span>
-        </div>
-        {!rows.length ? (
-          <div className="empty">
-            <h3>
-              {query
-                ? "Товары не найдены"
-                : mode === "checks"
-                  ? "Пунктов для проверки нет"
-                  : "В каталоге этой площадки пока нет карточек"}
-            </h3>
-            <p>
-              {query
-                ? "Измените поиск."
-                : "Выберите другой фильтр или загрузите отчёт площадки."}
-            </p>
-          </div>
-        ) : (
-          <div className="table-scroll">
-            <table
-              className={`catalog-table ${mode === "checks" ? "catalog-check-table" : ""}`}
-            >
-              <colgroup>
-                {(mode === "checks"
-                  ? [41, 26, 23, 10]
-                  : [41, 14, 14, 21, 10]
-                ).map((width, i) => (
-                  <col key={i} style={{ width: `${width}%` }} />
+      <div className={mode === "catalog" ? "catalog-layout-v2" : ""}>
+        <section
+          className={`card catalog-card ${mode === "catalog" ? "catalog-card-v2" : ""}`}
+        >
+          <div className="card-heading">
+            <div>
+              <h2>
+                {mode === "checks" ? "Проверка каталога" : "Каталог товаров"}
+              </h2>
+              <p>
+                {mode === "checks"
+                  ? "Проверки связей и статусы карточек WB"
+                  : "Общие карточки и предложения по сопоставлению"}
+              </p>
+            </div>
+            {mode === "catalog" ? (
+              <div className="catalog-view-switch" aria-label="Вид каталога">
+                {[
+                  ["cards", "Карточки", LayoutGrid],
+                  ["list", "Список", List],
+                ].map(([key, label, Icon]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={layout === key ? "active" : ""}
+                    aria-pressed={layout === key}
+                    onClick={() => setLayout(key)}
+                  >
+                    <Icon size={15} />
+                    {label}
+                  </button>
                 ))}
-              </colgroup>
-              <thead>
-                <tr>
-                  {(mode === "checks"
-                    ? ["Товар", "Что обнаружено", "Карточки", ""]
-                    : [
-                        "Товар",
-                        "Ozon · SKU",
-                        "WB · артикул",
-                        "Что проверить",
-                        "Фото",
-                      ]
-                  ).map((name, i) => (
-                    <th key={i}>{name}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map((row) =>
-                  mode === "checks" ? (
-                    <tr key={row.id}>
-                      <td>
+              </div>
+            ) : (
+              <span className="catalog-checked-count">
+                Проверено: {done.length}
+              </span>
+            )}
+          </div>
+          {!rows.length ? (
+            <div className="empty">
+              <h3>
+                {query
+                  ? "Товары не найдены"
+                  : mode === "checks"
+                    ? "Пунктов для проверки нет"
+                    : "В каталоге этой площадки пока нет карточек"}
+              </h3>
+              <p>
+                {query
+                  ? "Измените поиск."
+                  : "Выберите другой фильтр или загрузите отчёт площадки."}
+              </p>
+            </div>
+          ) : mode === "catalog" && layout === "cards" ? (
+            <div className="catalog-product-grid">
+              {visible.map((row) => {
+                const pending = row.checks.filter(
+                  (i) => !i.resolved && checks.some((c) => c.id === i.id),
+                );
+                return (
+                  <article className="catalog-product-card" key={row.id}>
+                    <div className="catalog-card-main">
+                      <ProductPhoto
+                        row={row}
+                        settings={state.cards[row.id]}
+                        revision={photoRevision}
+                        className="catalog-portrait"
+                        decorative
+                      />
+                      <div className="catalog-card-details">
                         <CatalogRowIdentity
                           name={row.name}
-                          articles={[
-                            ...new Set(
-                              row.offerIds.map(
-                                (id) => catalog.offers.get(id).article,
-                              ),
-                            ),
-                          ]}
-                          icon={<CheckMark check={row} />}
-                          onOpen={() => onCheck(row.id)}
+                          articles={row.articles}
+                          onOpen={() => onOpen(row.id)}
                         />
-                      </td>
-                      <td>
-                        <p className="catalog-check-title">{row.title}</p>
-                      </td>
-                      <td>
-                        <span className="catalog-sku-stack">
-                          {row.offerIds.map((id) => {
-                            const o = catalog.offers.get(id);
-                            return (
-                              <span key={id}>
-                                <span className="catalog-sku-market">
-                                  {o.marketplace === "ozon" ? "Ozon" : "WB"}
-                                </span>
-                                <CopyValue
-                                  value={o.sku}
-                                  label={
-                                    o.marketplace === "ozon"
-                                      ? "SKU Ozon"
-                                      : "артикул WB"
-                                  }
-                                />
-                              </span>
-                            );
-                          })}
-                        </span>
-                      </td>
-                      <td>
-                        <button
-                          className="text-button"
-                          onClick={() => onCheck(row.id)}
-                        >
-                          {row.resolved ? "Проверено" : "Проверить"}
-                          <ArrowUpRight size={13} />
-                        </button>
-                      </td>
-                    </tr>
-                  ) : (
-                    (() => {
-                      const pending = row.checks.filter(
-                        (i) => !i.resolved && checks.some((c) => c.id === i.id),
-                      );
-                      return (
-                        <tr key={row.id}>
-                          <td>
-                            <CatalogRowIdentity
-                              name={row.name}
-                              articles={row.articles}
-                              onOpen={() => onOpen(row.id)}
-                              icon={
-                                <ProductPhoto
-                                  row={row}
-                                  settings={state.cards[row.id]}
-                                  revision={photoRevision}
-                                  decorative
-                                />
-                              }
-                            >
-                              {pending.length > 0 && (
-                                <em className="catalog-mobile-status">
-                                  {pending[0].kind === "duplicate"
-                                    ? "Повтор артикула"
-                                    : pending[0].kind === "article"
-                                      ? "Артикулы отличаются"
-                                      : "Удалена в WB"}
-                                  {pending.length > 1
-                                    ? ` · ещё ${pending.length - 1}`
-                                    : ""}
-                                </em>
-                              )}
-                            </CatalogRowIdentity>
-                          </td>
-                          {["ozon", "wb"].map((market) => (
-                            <td key={market}>
-                              <span className="catalog-sku-stack">
-                                {row.offers
-                                  .filter((o) => o.marketplace === market)
-                                  .map((o) => (
-                                    <span
-                                      key={o.id}
-                                      className={o.deleted ? "deleted" : ""}
-                                    >
-                                      <CopyValue
-                                        value={o.sku}
-                                        label={
-                                          market === "ozon"
-                                            ? "SKU Ozon"
-                                            : "артикул WB"
-                                        }
-                                      />
-                                    </span>
-                                  ))}
-                                {!row.offers.some(
-                                  (o) => o.marketplace === market,
-                                ) && (
-                                  <span className="missing">Не найдена</span>
-                                )}
-                              </span>
-                            </td>
-                          ))}
-                          <td>
-                            <div className="catalog-row-checks">
-                              {pending.map((i) => (
-                                <CheckBadge
-                                  key={i.id}
-                                  check={i}
-                                  onClick={() => onCheck(i.id)}
-                                />
-                              ))}
-                              {!pending.length &&
-                                (row.status === "linked" ? (
-                                  <span className="catalog-linked">
-                                    <Check size={12} />
-                                    Связано
-                                  </span>
-                                ) : row.checks.length ? (
-                                  <span className="catalog-linked">
-                                    Проверено
-                                  </span>
-                                ) : (
-                                  <span className="catalog-quiet">
-                                    {row.status === "candidate"
-                                      ? "Совпадает артикул · связь не подтверждена"
-                                      : "Нет точной пары"}
+                        {["ozon", "wb"].map((market) => (
+                          <div className="catalog-offer-line" key={market}>
+                            <span className={`market-badge ${market}`}>
+                              {market === "ozon" ? "Ozon" : "WB"}
+                            </span>
+                            <div>
+                              {row.offers
+                                .filter((o) => o.marketplace === market)
+                                .map((o) => (
+                                  <span
+                                    key={o.id}
+                                    className={o.deleted ? "deleted" : ""}
+                                  >
+                                    <CopyValue
+                                      value={o.sku}
+                                      label={
+                                        market === "ozon"
+                                          ? "SKU Ozon"
+                                          : "артикул WB"
+                                      }
+                                    />
                                   </span>
                                 ))}
+                              {!row.offers.some(
+                                (o) => o.marketplace === market,
+                              ) && <span>Нет пары</span>}
                             </div>
-                          </td>
-                          <td>
-                            <span className="catalog-quiet">
-                              {state.cards[row.id]?.photoSource === "manual"
-                                ? "Ручное фото"
-                                : "Нет фото в Excel"}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })()
-                  ),
-                )}
-              </tbody>
-            </table>
-          </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="catalog-card-foot">
+                      <div>
+                        {pending.map((i) => (
+                          <CheckBadge
+                            key={i.id}
+                            check={i}
+                            onClick={() => onCheck(i.id)}
+                          />
+                        ))}
+                        {!pending.length && (
+                          <span>
+                            {row.status === "linked"
+                              ? "Связано"
+                              : row.status === "candidate"
+                                ? "Связь ещё не подтверждена"
+                                : "Нет точной пары"}
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        className="text-button"
+                        onClick={() => onOpen(row.id)}
+                      >
+                        Открыть <ArrowUpRight size={15} />
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="table-scroll">
+              <table
+                className={`catalog-table ${mode === "checks" ? "catalog-check-table" : ""}`}
+              >
+                <colgroup>
+                  {(mode === "checks"
+                    ? [41, 26, 23, 10]
+                    : [41, 14, 14, 21, 10]
+                  ).map((width, i) => (
+                    <col key={i} style={{ width: `${width}%` }} />
+                  ))}
+                </colgroup>
+                <thead>
+                  <tr>
+                    {(mode === "checks"
+                      ? ["Товар", "Что обнаружено", "Карточки", ""]
+                      : [
+                          "Товар",
+                          "Ozon · SKU",
+                          "WB · артикул",
+                          "Что проверить",
+                          "Фото",
+                        ]
+                    ).map((name, i) => (
+                      <th key={i}>{name}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {visible.map((row) =>
+                    mode === "checks" ? (
+                      <tr key={row.id}>
+                        <td>
+                          <CatalogRowIdentity
+                            name={row.name}
+                            articles={[
+                              ...new Set(
+                                row.offerIds.map(
+                                  (id) => catalog.offers.get(id).article,
+                                ),
+                              ),
+                            ]}
+                            icon={<CheckMark check={row} />}
+                            onOpen={() => onCheck(row.id)}
+                          />
+                        </td>
+                        <td>
+                          <p className="catalog-check-title">{row.title}</p>
+                        </td>
+                        <td>
+                          <span className="catalog-sku-stack">
+                            {row.offerIds.map((id) => {
+                              const o = catalog.offers.get(id);
+                              return (
+                                <span key={id}>
+                                  <span className="catalog-sku-market">
+                                    {o.marketplace === "ozon" ? "Ozon" : "WB"}
+                                  </span>
+                                  <CopyValue
+                                    value={o.sku}
+                                    label={
+                                      o.marketplace === "ozon"
+                                        ? "SKU Ozon"
+                                        : "артикул WB"
+                                    }
+                                  />
+                                </span>
+                              );
+                            })}
+                          </span>
+                        </td>
+                        <td>
+                          <button
+                            className="text-button"
+                            onClick={() => onCheck(row.id)}
+                          >
+                            {row.resolved ? "Проверено" : "Проверить"}
+                            <ArrowUpRight size={13} />
+                          </button>
+                        </td>
+                      </tr>
+                    ) : (
+                      (() => {
+                        const pending = row.checks.filter(
+                          (i) =>
+                            !i.resolved && checks.some((c) => c.id === i.id),
+                        );
+                        return (
+                          <tr key={row.id}>
+                            <td>
+                              <CatalogRowIdentity
+                                name={row.name}
+                                articles={row.articles}
+                                onOpen={() => onOpen(row.id)}
+                                icon={
+                                  <ProductPhoto
+                                    row={row}
+                                    settings={state.cards[row.id]}
+                                    revision={photoRevision}
+                                    decorative
+                                  />
+                                }
+                              >
+                                {pending.length > 0 && (
+                                  <em className="catalog-mobile-status">
+                                    {pending[0].kind === "duplicate"
+                                      ? "Повтор артикула"
+                                      : pending[0].kind === "article"
+                                        ? "Артикулы отличаются"
+                                        : "Удалена в WB"}
+                                    {pending.length > 1
+                                      ? ` · ещё ${pending.length - 1}`
+                                      : ""}
+                                  </em>
+                                )}
+                              </CatalogRowIdentity>
+                            </td>
+                            {["ozon", "wb"].map((market) => (
+                              <td key={market}>
+                                <span className="catalog-sku-stack">
+                                  {row.offers
+                                    .filter((o) => o.marketplace === market)
+                                    .map((o) => (
+                                      <span
+                                        key={o.id}
+                                        className={o.deleted ? "deleted" : ""}
+                                      >
+                                        <CopyValue
+                                          value={o.sku}
+                                          label={
+                                            market === "ozon"
+                                              ? "SKU Ozon"
+                                              : "артикул WB"
+                                          }
+                                        />
+                                      </span>
+                                    ))}
+                                  {!row.offers.some(
+                                    (o) => o.marketplace === market,
+                                  ) && (
+                                    <span className="missing">Не найдена</span>
+                                  )}
+                                </span>
+                              </td>
+                            ))}
+                            <td>
+                              <div className="catalog-row-checks">
+                                {pending.map((i) => (
+                                  <CheckBadge
+                                    key={i.id}
+                                    check={i}
+                                    onClick={() => onCheck(i.id)}
+                                  />
+                                ))}
+                                {!pending.length &&
+                                  (row.status === "linked" ? (
+                                    <span className="catalog-linked">
+                                      <Check size={12} />
+                                      Связано
+                                    </span>
+                                  ) : row.checks.length ? (
+                                    <span className="catalog-linked">
+                                      Проверено
+                                    </span>
+                                  ) : (
+                                    <span className="catalog-quiet">
+                                      {row.status === "candidate"
+                                        ? "Совпадает артикул · связь не подтверждена"
+                                        : "Нет точной пары"}
+                                    </span>
+                                  ))}
+                              </div>
+                            </td>
+                            <td>
+                              <span className="catalog-quiet">
+                                {state.cards[row.id]?.photoSource === "manual"
+                                  ? "Ручное фото"
+                                  : "Нет фото в Excel"}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })()
+                    ),
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <InfiniteList
+            shown={visible.length}
+            total={rows.length}
+            more={more}
+            onLoad={load}
+          />
+        </section>
+        {mode === "catalog" && (
+          <aside className="catalog-sidebar">
+            <section className="card dark-panel catalog-check-panel">
+              <span className="dashboard-icon">
+                <TriangleAlert size={20} />
+              </span>
+              <h2>Проверка сопоставлений</h2>
+              <strong>
+                {active.length}{" "}
+                <small>
+                  {checkCount(active.length).split(" ").slice(1).join(" ")}
+                </small>
+              </strong>
+              <p>
+                Решение принимается в карточке товара — перед подтверждением
+                связи.
+              </p>
+              {[
+                ["duplicate", "Повтор артикула"],
+                ["article", "Артикулы отличаются"],
+                ["deleted", "Удалена в WB"],
+              ].map(([kind, label]) => (
+                <button
+                  className="catalog-check-line"
+                  key={kind}
+                  onClick={() => onChecks(kind)}
+                >
+                  <span>{label}</span>
+                  <b>{active.filter((i) => i.kind === kind).length}</b>
+                </button>
+              ))}
+              <button className="button" onClick={() => onChecks("all")}>
+                Перейти к проверкам
+              </button>
+            </section>
+            <section className="card catalog-side-info">
+              <p>
+                <Link2 size={18} />
+                Предложения связей
+              </p>
+              <strong>
+                {
+                  rowsForMarket(catalog, marketplace).filter(
+                    (r) => r.status === "candidate",
+                  ).length
+                }{" "}
+                пар
+              </strong>
+              <p>
+                Совпадение артикулов требует подтверждения. Решения сохраняются
+                в карточке.
+              </p>
+            </section>
+            <section className="card catalog-side-info">
+              <p>
+                <Image size={18} />
+                Фото товара
+              </p>
+              <p>
+                Формат 3:4. Если в Excel нет фото, его можно загрузить в
+                карточке товара.
+              </p>
+            </section>
+          </aside>
         )}
-        <div className="pagination">
-          <span>
-            {mode === "checks"
-              ? checkCount(rows.length)
-              : `Показано ${rows.length ? current * limit + 1 : 0}–${Math.min((current + 1) * limit, rows.length)}`}
-          </span>
-          <div className="inline">
-            <button
-              type="button"
-              className="icon-button"
-              aria-label="Предыдущая страница"
-              disabled={current === 0}
-              onClick={() => setPage(current - 1)}
-            >
-              <ChevronLeft size={15} />
-            </button>
-            <span>
-              {current + 1} / {max + 1}
-            </span>
-            <button
-              type="button"
-              className="icon-button"
-              aria-label="Следующая страница"
-              disabled={current === max}
-              onClick={() => setPage(current + 1)}
-            >
-              <ChevronRight size={15} />
-            </button>
-          </div>
-        </div>
-      </section>
+      </div>
       <p className="catalog-context catalog-photo-status">
         <Image size={13} />
         Отсутствие фотографий в этих Excel — обычный статус. В счётчик проверок

@@ -154,7 +154,7 @@ test("modal cost, clipboard and manual photo survive reload and WB re-import in 
     .click();
   await expect(page.locator(".catalog-product-dialog")).toHaveCount(0);
   await expect(
-    page.locator(".catalog-table tbody .product-photo img"),
+    page.locator(".catalog-product-grid .product-photo img"),
   ).toHaveCount(1);
   await page.reload();
   await nav(page).getByRole("button", { name: "Товары", exact: true }).click();
