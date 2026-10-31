@@ -45,9 +45,7 @@ test("real report loads, product drilldown and date filters recalculate actual t
   ).toBeVisible();
   expect(errors).toEqual([]);
 });
-test("search, ABC, sorting, infinite scrolling and CSV work", async ({
-  page,
-}) => {
+test("search, ABC, sorting, infinite scrolling work", async ({ page }) => {
   await ready(page);
   await page.getByRole("button", { name: "Товары", exact: true }).click();
   await page
@@ -62,11 +60,6 @@ test("search, ABC, sorting, infinite scrolling and CSV work", async ({
   await expect(
     page.locator("tbody tr").first().locator("td").last(),
   ).toHaveText(/1\s*557\s*747/);
-  const download = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Экспорт CSV" }).click();
-  expect((await download).suggestedFilename()).toContain(
-    "formula_2025-11-03_2026-10-29.csv",
-  );
   await page.getByLabel("Поиск товаров").fill("такого товара точно нет");
   await expect(
     page.getByRole("heading", { name: "За этот период данных нет" }),

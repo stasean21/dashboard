@@ -230,9 +230,6 @@
   flex-shrink: 0;
   font-size: 16px;
 }
-.filter-bar .export-button {
-  margin-left: auto;
-}
 .filters .ui-select-trigger,
 .ad-filter-selects .ui-select-trigger {
   color: #30333e;

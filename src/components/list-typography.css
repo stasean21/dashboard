@@ -526,9 +526,6 @@
     flex-wrap: wrap;
     gap: 10px;
   }
-  .filter-bar .export-button {
-    margin-left: 0;
-  }
   .filters label {
     border: 0;
   }

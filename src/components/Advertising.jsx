@@ -8,7 +8,6 @@ import {
   BadgeRussianRuble,
   MousePointer2,
   Package,
-  Download,
   Info,
   RotateCcw,
   Search,
@@ -78,25 +77,6 @@ const sortRows = (rows, sort) =>
     if (bv == null) return -1;
     return (av - bv) * (sort.dir === "asc" ? 1 : -1);
   });
-function exportCSV(rows, filename) {
-  const escape = (v) => {
-    let s = String(v ?? "");
-    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-    return '"' + s.replaceAll('"', '""') + '"';
-  };
-  const url = URL.createObjectURL(
-    new Blob(
-      ["\ufeff" + rows.map((r) => r.map(escape).join(";")).join("\r\n")],
-      { type: "text/csv;charset=utf-8" },
-    ),
-  );
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
 function AdTable({
   rows,
   kind = "products",
@@ -601,36 +581,7 @@ export default function Advertising({
     setCampaign("all");
     setQuery("");
   }
-  function exportCurrent() {
-    const sorted = sortRows(rows, sort);
-    exportCSV(
-      [
-        [
-          "Название",
-          "SKU / ID кампании",
-          "Артикул продавца",
-          "Расход, ₽",
-          "Продажи, ₽",
-          "ДРР, %",
-          "Продано, шт.",
-          "Клики",
-          "Продажи модели, ₽",
-        ],
-        ...sorted.map((r) => [
-          r.name,
-          tab === "campaigns" ? r.id : r.sku,
-          r.article || "",
-          r.spend,
-          r.sales,
-          adValue(r, "drr") ?? "",
-          r.units,
-          r.clicks,
-          r.modelSales,
-        ]),
-      ],
-      `formula_ads_${view.period.start}_${view.period.end}_${tab}.csv`,
-    );
-  }
+
   const sortedCampaigns = sortRows(view.campaigns, {
     key: metric,
     dir: "desc",
@@ -727,14 +678,6 @@ export default function Advertising({
             Найти
           </button>
         </div>
-        <button
-          className="text-button"
-          onClick={exportCurrent}
-          disabled={!rows.length}
-        >
-          <Download size={14} />
-          Экспорт CSV
-        </button>
       </div>
       <div className="ad-metrics">
         {Object.entries(adMetricLabels).map(([key, title]) => (

@@ -57,7 +57,7 @@ test("advertising totals and campaign/tool filters use the correct attribution s
   ).toBeVisible();
   expect(errors).toEqual([]);
 });
-test("SKU detail, model attribution, sorting, attention list and CSV work", async ({
+test("SKU detail, model attribution, sorting, attention list work", async ({
   page,
 }) => {
   await ready(page);
@@ -79,11 +79,6 @@ test("SKU detail, model attribution, sorting, attention list and CSV work", asyn
   await expect(page.getByRole("dialog")).toContainText(/48\s*985/);
   await expect(page.getByRole("dialog")).toContainText("Реклама товара");
   await page.getByRole("button", { name: "Закрыть", exact: true }).click();
-  const download = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Экспорт CSV", exact: true }).click();
-  expect((await download).suggestedFilename()).toBe(
-    "formula_ads_2026-07-01_2026-09-28_products.csv",
-  );
   await page.getByRole("button", { name: "Очистить рекламный поиск" }).click();
   await page
     .getByRole("button", { name: "ДРР в продвижении", exact: true })
@@ -173,11 +168,6 @@ test("one calendar drives sales, advertising and export; aggregate totals never 
   await expect(page.locator(".date-button")).toContainText(/01.07.*28.09.2026/);
   await expect(page.locator(".ad-metric").first()).toContainText(
     /159\s*216,09/,
-  );
-  const download = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Экспорт CSV", exact: true }).click();
-  expect((await download).suggestedFilename()).toBe(
-    "formula_ads_2026-07-01_2026-09-28_overview.csv",
   );
   await main(page).getByRole("button", { name: "Обзор", exact: true }).click();
   await expect(page.locator(".date-button")).toContainText(/01.07.*28.09.2026/);

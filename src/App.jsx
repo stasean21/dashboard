@@ -13,7 +13,6 @@ import {
 } from "recharts";
 import {
   Upload,
-  Download,
   Search,
   X,
   ArrowUpRight,
@@ -1300,51 +1299,6 @@ function App() {
       setToast("Не удалось прочитать файл. Попробуйте ещё раз.");
     }
   }
-  function exportCsv() {
-    const rows = [
-      [
-        "Товар",
-        "SKU",
-        "Артикул",
-        "ABC",
-        "Заказано, шт.",
-        "Сумма заказов, ₽",
-        "Выкуплено, шт.",
-        "Отменено, шт.",
-        "Возвращено, шт.",
-        "Средняя цена, ₽",
-      ],
-      ...(tab === 3 ? qualityProducts : tableProducts).map((p) => [
-        p.name,
-        p.sku,
-        p.article,
-        p.abc,
-        p.orders,
-        p.amount,
-        p.bought,
-        p.cancelled,
-        p.returned,
-        p.orders ? (p.amount / p.orders).toFixed(2).replace(".", ",") : "",
-      ]),
-    ];
-    const escape = (v) => {
-      let s = String(v ?? "");
-      if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-      return '"' + s.replaceAll('"', '""') + '"';
-    };
-    const url = URL.createObjectURL(
-      new Blob(
-        ["\ufeff" + rows.map((r) => r.map(escape).join(";")).join("\r\n")],
-        { type: "text/csv;charset=utf-8" },
-      ),
-    );
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `formula_${filters.start}_${filters.end}.csv`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setToast("Таблица выбранных товаров выгружена в CSV.");
-  }
   const onSort = (key) =>
     setSort((s) => ({
       key,
@@ -1653,14 +1607,6 @@ function App() {
                   </button>
                 )}
               </div>
-              <button
-                className="text-button export-button"
-                onClick={exportCsv}
-                disabled={view.empty}
-              >
-                <Download size={15} />
-                Экспорт CSV
-              </button>
             </div>
             {tab === 0 && !salesRangeOutside && (
               <div className="metrics-grid">
@@ -2286,8 +2232,7 @@ function App() {
               <p>
                 Excel обрабатывается в браузере и не отправляется на сервер.
                 Загруженный файл действует до обновления страницы. После
-                обновления открывается исходная выгрузка. CSV содержит только
-                выбранные товары.
+                обновления открывается исходная выгрузка.
               </p>
             </div>
           )}
